@@ -44,6 +44,17 @@ class SensorsServiceEndpoint final : public ServiceHandler {
     GuestContext& context_;
 };
 
+class IButtonServiceEndpoint final : public ServiceHandler {
+   public:
+    explicit IButtonServiceEndpoint(GuestContext& context) : context_(context) {}
+    [[nodiscard]] ServiceDescriptor Describe() const override;
+    [[nodiscard]] int32_t Call(uint32_t method_id, const uint8_t* request, uint32_t request_size, uint8_t* response,
+                               uint32_t response_capacity, uint32_t& response_size_out) override;
+
+   private:
+    GuestContext& context_;
+};
+
 class GpioServiceEndpoint final : public ServiceHandler {
    public:
     explicit GpioServiceEndpoint(GuestContext& context) : context_(context) {}

@@ -175,6 +175,34 @@ int32_t SensorsServiceEndpoint::Call(uint32_t method_id, const uint8_t* request,
     return MICROPIXEL_STATUS_UNSUPPORTED;
 }
 
+ServiceDescriptor IButtonServiceEndpoint::Describe() const {
+    return {.service_id = MICROPIXEL_SERVICE_IBUTTON,
+            .interface_major = 1,
+            .flags = MICROPIXEL_SERVICE_FLAG_CALL,
+            .max_request_bytes = sizeof(micropixel_ibutton_request_t),
+            .max_response_bytes = sizeof(micropixel_ibutton_response_t)};
+}
+
+int32_t IButtonServiceEndpoint::Call(uint32_t method, const uint8_t* request, uint32_t request_size, uint8_t* response,
+                                     uint32_t capacity, uint32_t& size_out) {
+    micropixel_ibutton_request_t wire{};
+    if (method != MICROPIXEL_IBUTTON_SCAN && method != MICROPIXEL_IBUTTON_READ) return MICROPIXEL_STATUS_UNSUPPORTED;
+    if (!ReadRequest(request, request_size, wire)) return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    if (method == MICROPIXEL_IBUTTON_READ && (wire.length == 0 || wire.length > 64))
+        return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    if (method == MICROPIXEL_IBUTTON_SCAN && (wire.length != 0 || wire.offset != 0))
+        return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    if (response == nullptr || capacity < sizeof(micropixel_ibutton_response_t)) {
+        size_out = sizeof(micropixel_ibutton_response_t);
+        return MICROPIXEL_STATUS_BUFFER_TOO_SMALL;
+    }
+    micropixel_ibutton_response_t result{};
+    result.size = sizeof(result);
+    const auto status = context_.IButtonCall(method, wire, result);
+    if (status != MICROPIXEL_STATUS_OK) return status;
+    return WriteValue(result, response, capacity, size_out);
+}
+
 ServiceDescriptor GpioServiceEndpoint::Describe() const {
     return ServiceDescriptor{
         .service_id = MICROPIXEL_SERVICE_GPIO,

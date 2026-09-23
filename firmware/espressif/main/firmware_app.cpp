@@ -1,5 +1,7 @@
-#include "firmware_app.hpp"
-
+#include "sdkconfig.h"
+#if CONFIG_MICROPIXEL_BOARD_METALIO_CLAW4
+#include "platform/onewire/ds2484_reader.hpp"
+#endif
 #include <cinttypes>
 
 #include "device/device_services.hpp"
@@ -8,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_ota_ops.h"
+#include "firmware_app.hpp"
 #include "host/controller/control_dispatcher.hpp"
 #include "host/controller/host_controller.hpp"
 #include "host/controller/local/local_control_agent.hpp"
@@ -117,9 +120,14 @@ void FirmwareApp::Run() {
     // Keep them out of app_main's bounded stack and, on PSRAM boards, out of
     // internal SRAM: RemoteControlAgent owns several fixed-capacity protocol
     // buffers even when remote control is disabled.
+    device::IButton* ibutton = nullptr;
+#if CONFIG_MICROPIXEL_BOARD_METALIO_CLAW4
+    static MICROPIXEL_EXT_RAM_BSS platform::onewire::Ds2484Reader ibutton_reader(*services.devices, *services.gpio);
+    ibutton = &ibutton_reader;
+#endif
     static MICROPIXEL_EXT_RAM_BSS device::DeviceServices devices(
         *services.graphics, services.board_info.display, *services.input, *services.audio, *services.random,
-        *services.devices, *services.sensors, *services.gpio, *services.haptics, *services.battery);
+        *services.devices, *services.sensors, *services.gpio, *services.haptics, *services.battery, ibutton);
     logging::SystemLogBuffer& system_logs = logging::SystemLogs();
     static MICROPIXEL_EXT_RAM_BSS control::ControlDispatcher controls(
         [](void* context, const char* app_id) {

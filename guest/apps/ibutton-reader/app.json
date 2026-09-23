@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "app_id": "micropixel.ibutton-reader",
+  "version": "0.1.0",
+  "threading": "none",
+  "title": "iButton Reader",
+  "sources": ["main.cpp"],
+  "requirements": {
+    "schema_version": 1,
+    "display": {"layouts": ["square", "portrait", "landscape"], "min_width": 720, "min_height": 720},
+    "required": ["input.touch"], "optional": [], "any_of": [], "services": {}
+  }
+}

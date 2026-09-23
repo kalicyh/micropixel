@@ -42,6 +42,15 @@ build_and_run() {
     "$test_binary"
 }
 
+build_and_run ibutton_protocol "$workspace_root/tools/tests/test_ibutton_protocol.cpp"
+# A native syntax check supplements, but does not replace, the release WASI build.
+"$cxx" -std=c++23 -Wall -Wextra -Werror -fsyntax-only -I "$workspace_root/guest" \
+    "$workspace_root/guest/runtime/ibutton.cpp" "$workspace_root/guest/apps/ibutton-reader/main.cpp"
+echo "iButton protocol and Guest syntax checks passed"
+if [[ "${1:-}" == "--ibutton-only" ]]; then
+    exit 0
+fi
+
 build_and_run_c() {
     local name="$1"
     shift

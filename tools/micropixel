@@ -1853,6 +1853,7 @@ def _run_build_sources(args: argparse.Namespace) -> None:
             root / "guest/runtime/audio.cpp",
             root / "guest/runtime/timers.cpp",
             root / "guest/runtime/devices.cpp",
+            root / "guest/runtime/ibutton.cpp",
             root / "guest/runtime/display_context.cpp",
             root / "guest/runtime/graphics.cpp",
             root / "guest/runtime/direct_surface.cpp",

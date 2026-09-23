@@ -85,6 +85,11 @@ class GuestContext final {
         return service_registry_.Submit(service_handle, channel_id, bytes, length);
     }
 
+    [[nodiscard]] int32_t IButtonCall(uint32_t method, const micropixel_ibutton_request_t& request,
+                                      micropixel_ibutton_response_t& response) {
+        auto* reader = devices_.ibutton();
+        return reader ? reader->Call(method, request, response) : MICROPIXEL_STATUS_UNSUPPORTED;
+    }
     [[nodiscard]] ServiceResult<micropixel_timer_handle_t> TimerCreate() { return timers_.Create(); }
     [[nodiscard]] ServiceResult<void> TimerStart(micropixel_timer_handle_t handle, uint64_t initial_delay_us,
                                                  uint64_t period_us) {
@@ -365,6 +370,7 @@ class GuestContext final {
     DevicesServiceEndpoint devices_endpoint_;
     SensorsServiceEndpoint sensors_endpoint_;
     GpioServiceEndpoint gpio_endpoint_;
+    IButtonServiceEndpoint ibutton_endpoint_;
     HapticsServiceEndpoint haptics_endpoint_;
     PowerInfoServiceEndpoint power_info_endpoint_;
     ServiceRegistry service_registry_;

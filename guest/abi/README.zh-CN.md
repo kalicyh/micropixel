@@ -388,3 +388,14 @@ Haptics finished 和 Core host wake。新增事件不会扩大 Core import 表�
 
 新增 import 必须同时给出无法用现有 Core/Service transport 表达的真机性能证据，并更新 C ABI、
 Host 注册、Guest lowering、allowlist、内存安全负向测试和兼容性 fixture。
+
+## iButton 实验性只读服务
+
+服务 ID `24`，接口 `1.0`，方法 `1=SCAN`、`2=READ`，仅使用现有 Service Call import。
+线格式见 [micropixel_ibutton.h](micropixel_ibutton.h)：请求固定 24 字节，响应固定 84 字节，
+均为小端布局。响应 `operation_status` 与 transport 返回状态分离。
+SCAN 要求 offset/length 为零；READ 要求 length 为 1–64，并由 Host 检查 family、ROM CRC8、
+器件容量和页边界。响应 length 只有成功读取时才非零，错误时清空数据。
+
+此扩展没有原始 I²C 访问或写入命令。每次调用独立获取并释放 GP15/17 GPIO 占用及 DS2484
+I²C 资源；Runtime 经 Device 合约调用 Platform，不依赖 ESP-IDF 类型。

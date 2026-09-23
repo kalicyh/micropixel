@@ -10,6 +10,7 @@
 #include "sdk/gpio.hpp"
 #include "sdk/graphics.hpp"
 #include "sdk/haptics.hpp"
+#include "sdk/ibutton.hpp"
 #include "sdk/input.hpp"
 #include "sdk/launch_arguments.hpp"
 #include "sdk/localization.hpp"
@@ -58,6 +59,7 @@ class Application final {
     }
     [[nodiscard]] constexpr Devices devices() const noexcept { return Devices{Devices::CapabilityToken{}}; }
     [[nodiscard]] constexpr Sensors sensors() const noexcept { return Sensors{Sensors::CapabilityToken{}}; }
+    [[nodiscard]] constexpr IButton ibutton() const noexcept { return IButton{IButton::CapabilityToken{}}; }
     [[nodiscard]] constexpr Gpio gpio() const noexcept { return Gpio{Gpio::CapabilityToken{}}; }
     [[nodiscard]] constexpr Haptics haptics() const noexcept { return Haptics{Haptics::CapabilityToken{}}; }
     [[nodiscard]] constexpr PowerInfo power_info() const noexcept { return PowerInfo{PowerInfo::CapabilityToken{}}; }

@@ -12,6 +12,7 @@
 #include "device/contracts/gpio.hpp"
 #include "device/contracts/graphics.hpp"
 #include "device/contracts/haptics.hpp"
+#include "device/contracts/ibutton.hpp"
 #include "device/contracts/input.hpp"
 #include "device/contracts/random.hpp"
 #include "device/contracts/sensors.hpp"
@@ -180,7 +181,8 @@ class RandomService final {
 class DeviceServices final {
    public:
     DeviceServices(Graphics& graphics, DisplayInfo display, Input& input, Audio& audio, Random& random,
-                   DeviceCatalog& devices, Sensors& sensors, Gpio& gpio, Haptics& haptics, Battery& battery)
+                   DeviceCatalog& devices, Sensors& sensors, Gpio& gpio, Haptics& haptics, Battery& battery,
+                   IButton* ibutton = nullptr)
         : graphics_(graphics, display),
           input_(input),
           audio_(audio),
@@ -189,9 +191,12 @@ class DeviceServices final {
           sensors_(sensors),
           gpio_(gpio),
           haptics_(haptics),
-          power_info_(devices, battery) {}
+          power_info_(devices, battery),
+          ibutton_(ibutton) {}
     DeviceServices(const DeviceServices&) = delete;
     DeviceServices& operator=(const DeviceServices&) = delete;
+
+    [[nodiscard]] IButton* ibutton() { return ibutton_; }
 
     [[nodiscard]] GraphicsService& graphics() {  // NOLINT(readability-identifier-naming)
         return graphics_;
@@ -231,6 +236,7 @@ class DeviceServices final {
     GpioService gpio_;
     HapticsService haptics_;
     PowerInfoService power_info_;
+    IButton* ibutton_{};
 };
 
 }  // namespace micropixel::device

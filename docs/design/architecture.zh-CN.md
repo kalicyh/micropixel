@@ -299,3 +299,13 @@ Wi-Fi 开关动画期间保留控件，网络列表在动画结束后重建，�
 USB 与远程控制的 `network.available/enabled/connected` 使用相同聚合语义，保留现有 MPX1 字段布局。
 
 网络上报字段与小区数据有效期见 [网络遥测](network-telemetry.zh-CN.md)。
+
+### iButton 只读扩展
+
+`FirmwareApp` 在 Metalio-Claw4 注入 `device::IButton`，Runtime 的服务 24 经该合约访问
+Platform DS2484 实现。Platform 通过 DeviceCatalog 枚举 GP17/15，并使用现有 Gpio Open/Close
+保证引脚占用互斥。单次调用只扫描或读取一个页/SubKey，使用有界工作区与超时；调用结束和错误路径
+释放 I²C 与 GPIO 资源，强上拉采用 best-effort 关闭。其他板不注入实现。
+
+Guest 的 `app.ibutton()` 通过 Guest Runtime 转换线格式；不开放 ESP-IDF、原始总线事务或硬件指针。
+读取范围、ROM CRC、单设备条件、长度及响应容量由 Host 独立检查。

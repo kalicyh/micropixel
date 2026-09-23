@@ -1,4 +1,5 @@
 list(APPEND micropixel_sources
+    "platform/onewire/ds2484_reader.cpp"
     "platform/boards/metalio-claw4/battery_peripheral.cpp"
     "platform/boards/metalio-claw4/board_io.cpp"
     "platform/boards/metalio-claw4/display/screen_capture.cpp"

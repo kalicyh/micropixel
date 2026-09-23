@@ -420,3 +420,11 @@ Network、Camera 和网络资源加载尚未定义公开接口。
 Mode7Plane、Span 与 surface 纹理的开发步骤见 [图形开发指南](README.zh-CN.md#mode7-与-surface-纹理)。
 
 Windows Preview 的安装管理与结构化命令见 [AI 使用指南](AI.zh-CN.md)。
+
+### iButton 只读扩展（实验性）
+
+`app.ibutton().Scan()` 返回 ROM ID；`Read(rom, offset, length, password)` 读取单页，返回
+`Result<IButtonPage>`。服务调用错误使用 `Result`，器件/总线结果使用 `IButtonStatus`。
+DS1977 单页最多 64 字节，DS1991 单 SubKey 最多 48 字节，不允许一次跨页读取。
+仅当前分支的 Metalio-Claw4 Host 实现此服务。详见
+[iButton Reader](../apps/ibutton-reader/README.zh-CN.md)。

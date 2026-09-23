@@ -8,13 +8,13 @@ DS1991 读取协议。点击“读取”显示当前 ROM ID 和第一页十六�
 
 | Metalio-Claw4 | DS2484 |
 | --- | --- |
-| 任一开放 GPIO | SDA（App 自动探测） |
-| 另一开放 GPIO | SCL（App 自动探测） |
+| GP17 | SDA |
+| GP15 | SCL |
 | 3V3 | VCC、SLPZ |
 | GND | GND |
 
 DS2484 的 1WIRE 接 iButton DQ，外壳接地；地址为 `0x18`，I²C 为 400 kHz。
-按 DS2484 模块要求配置总线上拉，SLPZ 不得悬空。GP15/17 不能同时由其他功能占用。
+按 DS2484 模块要求配置总线上拉，SLPZ 不得悬空。DS2484 I²C 地址固定为 `0x18`；GP15/17 不能同时由其他功能占用。
 这不是与另一块 ESP32 的 UART 连接，也不是将 iButton DQ 直接接到 GP17。
 
 ## 使用

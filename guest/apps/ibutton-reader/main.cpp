@@ -12,19 +12,19 @@ constexpr char kHex[] = "0123456789ABCDEF";
 const char* StatusText(IButtonStatus status) {
     switch (status) {
         case IButtonStatus::kOk:
-            return "读取完成";
+            return "Read complete";
         case IButtonStatus::kNoDevice:
-            return "未检测到设备或设备已更换，请重新读取";
+            return "No device or device changed; scan again";
         case IButtonStatus::kMultipleDevices:
-            return "请只连接一个 iButton";
+            return "Connect one iButton only";
         case IButtonStatus::kUnsupported:
-            return "仅支持 DS1977 / DS1991";
+            return "Only DS1977 / DS1991 supported";
         case IButtonStatus::kBusError:
-            return "总线错误：检查接线、DS2484 和引脚占用";
+            return "Bus error: check wiring, DS2484 and GPIO";
         case IButtonStatus::kCrcError:
-            return "CRC 错误：检查密码或设备接触";
+            return "CRC error: check password and contact";
         default:
-            return "读取范围无效";
+            return "Invalid read range";
     }
 }
 void Hex(char* target, const uint8_t* source, unsigned length) {
@@ -61,24 +61,23 @@ int main() {
         return parent.CreateTextButton(
             {.bounds = bounds, .text = text, .style = {.background = kAccent, .font = SystemFont::kMedium}});
     };
-    label(main_view, 20, "iButton · DS1977 / DS1991", SystemFont::kLarge);
-    auto bus_label = label(main_view, 70, "DS2484 · 自动轮询 GPIO · 0x18", SystemFont::kSmall);
-    auto id_label = label(main_view, 108, "ID：待读取");
-    auto page_label = label(main_view, 151, "点击读取以识别设备并读取第一页");
-    auto status_label = label(main_view, 192, "先设置设备的 8 字节访问密码", SystemFont::kSmall);
+    label(main_view, 20, "iButton | DS1977 / DS1991", SystemFont::kLarge);
+    auto id_label = label(main_view, 70, "ID: Not scanned");
+    auto page_label = label(main_view, 113, "Tap Read to identify and read page 1");
+    auto status_label = label(main_view, 154, "Set the 8-byte access password first", SystemFont::kSmall);
     std::array<LabelNode, 8> rows;
-    for (unsigned i = 0; i < rows.size(); ++i) rows[i] = label(main_view, 240 + i * 34, " ", SystemFont::kSmall);
-    auto warning = label(main_view, 522, " ", SystemFont::kSmall);
-    auto read = button(main_view, {24, 575, 210, 60}, "读取");
-    auto previous = button(main_view, {254, 575, 210, 60}, "上一页");
-    auto next = button(main_view, {484, 575, 210, 60}, "下一页");
-    auto edit = button(main_view, {24, 648, 670, 54}, "设置访问密码");
-    label(password_view, 22, "访问密码（16 位十六进制）", SystemFont::kLarge);
-    label(password_view, 76, "DS1977 使用密码 1；DS1991 分别使用密码 1 / 2 / 3", SystemFont::kSmall);
+    for (unsigned i = 0; i < rows.size(); ++i) rows[i] = label(main_view, 202 + i * 34, " ", SystemFont::kSmall);
+    auto warning = label(main_view, 484, " ", SystemFont::kSmall);
+    auto read = button(main_view, {24, 575, 210, 60}, "Read");
+    auto previous = button(main_view, {254, 575, 210, 60}, "Previous");
+    auto next = button(main_view, {484, 575, 210, 60}, "Next");
+    auto edit = button(main_view, {24, 648, 670, 54}, "Set Access Password");
+    label(password_view, 22, "Access Password (16 hex digits)", SystemFont::kLarge);
+    label(password_view, 76, "DS1977: password 1 | DS1991: passwords 1 / 2 / 3", SystemFont::kSmall);
     auto password_label = label(password_view, 128, " ", SystemFont::kLarge);
     auto cursor_label = label(password_view, 180, " ", SystemFont::kSmall);
     std::array<ui::TextButton, 3> password_tabs;
-    constexpr const char* kPasswordTabLabels[]{"密码 1", "密码 2", "密码 3"};
+    constexpr const char* kPasswordTabLabels[]{"Password 1", "Password 2", "Password 3"};
     for (unsigned i = 0; i < 3; ++i)
         password_tabs[i] = button(password_view, {24 + static_cast<int>(i) * 230, 220, 210, 52}, kPasswordTabLabels[i]);
     std::array<ui::TextButton, 16> keys;
@@ -87,9 +86,9 @@ int main() {
         keys[i] = button(password_view,
                          {24 + static_cast<int>(i % 4) * 170, 290 + static_cast<int>(i / 4) * 65, 155, 55}, text);
     }
-    auto backspace = button(password_view, {24, 565, 320, 55}, "前一位");
-    auto done = button(password_view, {374, 565, 320, 55}, "完成");
-    label(password_view, 652, "仅保存在本次运行内存中；默认全 FF 不保证正确", SystemFont::kSmall);
+    auto backspace = button(password_view, {24, 565, 320, 55}, "Previous Digit");
+    auto done = button(password_view, {374, 565, 320, 55}, "Done");
+    label(password_view, 652, "RAM only; default FF may not be correct", SystemFont::kSmall);
     std::array<std::array<uint8_t, 8>, 3> passwords;
     for (auto& password : passwords) password.fill(0xFF);
     unsigned password_index = 0, cursor = 0;
@@ -104,21 +103,24 @@ int main() {
         Hex(value, passwords[password_index].data(), 8);
         password_label.SetText(value);
         FixedString<64> text;
-        text.Append("密码 ");
+        text.Append("Password ");
         text.AppendUint(password_index + 1);
-        text.Append(" · 下一次输入替换第 ");
+        text.Append(" | next digit replaces #");
         text.AppendUint(cursor + 1);
-        text.Append(" 位");
         cursor_label.SetText(text.c_str());
     };
     auto queue_read = [&](bool scan) {
         clear_data();
         pending_scan = scan;
         pending_read = !scan;
-        status_label.SetText("正在读取…");
+        status_label.SetText("Reading...");
         warning.SetText(" ");
     };
-    auto present = [&] { app.renderer().Present(scene).value(); };
+    auto present = [&] {
+        const auto result = app.renderer().Present(scene);
+        if (!result) app.log().Error("iButton Reader: scene rendering failed");
+        return static_cast<bool>(result);
+    };
     auto timer = app.timers().Every(30_ms).value();
     present();
     app.Run([&](const Event& event) {
@@ -128,29 +130,22 @@ int main() {
             if (pending_scan) {
                 pending_scan = false;
                 selected = false;
-                id_label.SetText("ID：未识别");
+                id_label.SetText("ID: Not identified");
                 page_label.SetText(" ");
                 auto result = app.ibutton().Scan();
                 if (!result)
-                    status_label.SetText("Host 未提供服务或服务调用失败");
+                    status_label.SetText("Host service unavailable or call failed");
                 else if (result->status != IButtonStatus::kOk)
                     status_label.SetText(StatusText(result->status));
                 else {
-                    FixedString<64> bus;
-                    bus.Append("DS2484 · SDA GP");
-                    bus.AppendUint(result->sda_line);
-                    bus.Append(" / SCL GP");
-                    bus.AppendUint(result->scl_line);
-                    bus.Append(" · 0x18");
-                    bus_label.SetText(bus.c_str());
                     rom = result->rom;
                     char id[17];
                     Hex(id, rom.data(), 8);
                     FixedString<64> text;
                     text.Append("ID: ");
                     text.Append(id);
-                    text.Append(" · ");
-                    text.Append(rom[0] == 0x37 ? "DS1977" : rom[0] == 0x02 ? "DS1991" : "未知型号");
+                    text.Append(" | ");
+                    text.Append(rom[0] == 0x37 ? "DS1977" : rom[0] == 0x02 ? "DS1991" : "Unknown device");
                     id_label.SetText(text.c_str());
                     selected = rom[0] == 0x37 || rom[0] == 0x02;
                     if (selected) {
@@ -165,18 +160,18 @@ int main() {
                 pending_read = false;
                 auto result = app.ibutton().Read(rom, offset, stride, passwords[rom[0] == 0x02 ? offset / 48 : 0]);
                 FixedString<96> heading;
-                heading.Append("地址 ");
+                heading.Append("Address ");
                 AppendHexWord(heading, offset);
-                heading.Append("–");
+                heading.Append("-");
                 AppendHexWord(heading, offset + stride - 1);
-                heading.Append(" · ");
+                heading.Append(" | ");
                 heading.AppendUint(offset / stride + 1);
                 heading.Append(" / ");
                 heading.AppendUint(limit / stride);
-                heading.Append(" 页");
+                heading.Append(" page");
                 page_label.SetText(heading.c_str());
                 if (!result)
-                    status_label.SetText("服务调用失败，请重试");
+                    status_label.SetText("Service call failed; try again");
                 else {
                     status_label.SetText(StatusText(result->status));
                     if (result->status == IButtonStatus::kOk) {
@@ -191,8 +186,8 @@ int main() {
                             }
                             rows[row].SetText(text.c_str());
                         }
-                        warning.SetText(rom[0] == 0x02 ? "DS1991 无数据 CRC：错误密码可能返回伪数据"
-                                                       : "DS1977 页面 CRC16 校验通过");
+                        warning.SetText(rom[0] == 0x02 ? "DS1991 has no data CRC; a wrong password may return false data"
+                                                       : "DS1977 page CRC16 verified");
                     }
                 }
             }
@@ -230,7 +225,7 @@ int main() {
                 }
                 if (edit.OnTouch(*touch).clicked) {
                     clear_data();
-                    status_label.SetText("密码已进入编辑，完成后请重新读取");
+                    status_label.SetText("Password changed; tap Read to scan again");
                     editing = true;
                     update_password();
                     main_view.SetVisible(false);

@@ -136,53 +136,57 @@ int32_t Ds2484Reader::Call(uint32_t method, const micropixel_ibutton_request_t& 
         micropixel_device_id_t device{};
         uint16_t line{};
     };
-    std::array<Candidate, 14> candidates{};
-    uint32_t candidate_count = 0;
+    Candidate sda{};
+    Candidate scl{};
+    bool has_sda = false;
+    bool has_scl = false;
     for (uint32_t index = 0; index < devices_.Count(); ++index) {
         micropixel_device_info_t info{};
         micropixel_gpio_info_t line{};
         if (devices_.GetByIndex(index, info) != MICROPIXEL_STATUS_OK ||
             gpio_.GetInfo(info.device, line) != MICROPIXEL_STATUS_OK)
             continue;
-        if (candidate_count < candidates.size()) candidates[candidate_count++] = {info.device, line.line_number};
-    }
-    if (candidate_count < 2) return MICROPIXEL_STATUS_UNSUPPORTED;
-    for (uint32_t sda_index = 0; sda_index < candidate_count; ++sda_index) {
-        for (uint32_t scl_index = 0; scl_index < candidate_count; ++scl_index) {
-            if (sda_index == scl_index) continue;
-            const Candidate sda = candidates[sda_index];
-            const Candidate scl = candidates[scl_index];
-            Connection connection(gpio_);
-            if (!connection.Open(sda.device, scl.device, sda.line, scl.line)) continue;
-            response.sda_line = static_cast<uint8_t>(sda.line);
-            response.scl_line = static_cast<uint8_t>(scl.line);
-            ReadStatus status;
-            if (method == MICROPIXEL_IBUTTON_SCAN) {
-                status = Scan(connection, response.rom);
-            } else {
-                // Scan before each page so removal/replacement or a second device cannot
-                // silently turn a stale selection into plausible data (especially DS1991).
-                status = Scan(connection, response.rom);
-                if (status == ReadStatus::kOk) {
-                    for (unsigned i = 0; i < 8; ++i) {
-                        if (response.rom[i] != request.rom[i]) status = ReadStatus::kNoDevice;
-                    }
-                }
-                if (status == ReadStatus::kOk) {
-                    status = ReadPage(connection, request.rom, request.offset, request.password,
-                                      {response.data, request.length});
-                }
-                if (status == ReadStatus::kOk)
-                    response.length = request.length;
-                else
-                    for (auto& byte : response.data) byte = 0;
-            }
-            response.operation_status = static_cast<uint32_t>(status);
-            return MICROPIXEL_STATUS_OK;
+        if (line.line_number == 17U) {
+            sda = {info.device, line.line_number};
+            has_sda = true;
+        } else if (line.line_number == 15U) {
+            scl = {info.device, line.line_number};
+            has_scl = true;
         }
     }
-    ESP_LOGI(kTag, "DS2484 not found across %" PRIu32 " ordered GPIO pairs", candidate_count * (candidate_count - 1));
-    response.operation_status = static_cast<uint32_t>(ReadStatus::kBusError);
+    if (!has_sda || !has_scl) {
+        response.operation_status = static_cast<uint32_t>(ReadStatus::kBusError);
+        return MICROPIXEL_STATUS_OK;
+    }
+    Connection connection(gpio_);
+    response.sda_line = 17U;
+    response.scl_line = 15U;
+    if (!connection.Open(sda.device, scl.device, sda.line, scl.line)) {
+        response.operation_status = static_cast<uint32_t>(ReadStatus::kBusError);
+        return MICROPIXEL_STATUS_OK;
+    }
+    ReadStatus status;
+    if (method == MICROPIXEL_IBUTTON_SCAN) {
+        status = Scan(connection, response.rom);
+    } else {
+        // Scan before each page so removal/replacement or a second device cannot
+        // silently turn a stale selection into plausible data (especially DS1991).
+        status = Scan(connection, response.rom);
+        if (status == ReadStatus::kOk) {
+            for (unsigned i = 0; i < 8; ++i) {
+                if (response.rom[i] != request.rom[i]) status = ReadStatus::kNoDevice;
+            }
+        }
+        if (status == ReadStatus::kOk) {
+            status = ReadPage(connection, request.rom, request.offset, request.password,
+                              {response.data, request.length});
+        }
+        if (status == ReadStatus::kOk)
+            response.length = request.length;
+        else
+            for (auto& byte : response.data) byte = 0;
+    }
+    response.operation_status = static_cast<uint32_t>(status);
     return MICROPIXEL_STATUS_OK;
 }
 }  // namespace micropixel::platform::onewire

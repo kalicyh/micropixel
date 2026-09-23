@@ -5,6 +5,8 @@
 #define MICROPIXEL_PLATFORM_ONEWIRE_IBUTTON_PROTOCOL_HPP
 
 #include <cstdint>
+#include <algorithm>
+#include <array>
 #include <span>
 
 namespace micropixel::platform::onewire {
@@ -23,7 +25,7 @@ class Bus {
    public:
     virtual ~Bus() = default;
     virtual bool Reset(bool& present) = 0;
-    virtual bool Write(uint8_t byte, bool strong_pullup = false) = 0;
+    virtual bool Write(uint8_t byte, uint32_t strong_pullup_us = 0U) = 0;
     virtual bool Read(uint8_t& byte) = 0;
     virtual bool Bit(bool output, bool& input) = 0;
 };
@@ -100,7 +102,7 @@ inline ReadStatus ReadPage(Bus& bus, std::span<const uint8_t, 8> rom, uint16_t o
     for (unsigned i = 0; i < 3; ++i)
         if (!bus.Write(frame[i])) return ReadStatus::kBusError;
     for (unsigned i = 0; i < 8; ++i)
-        if (!bus.Write(password[i], i == 7)) return ReadStatus::kBusError;
+        if (!bus.Write(password[i], i == 7 ? 3000U : 0U)) return ReadStatus::kBusError;
     const unsigned remaining = 64 - offset % 64;
     for (unsigned i = 0; i < remaining; ++i)
         if (!bus.Read(frame[i + 3])) return ReadStatus::kBusError;
@@ -111,6 +113,68 @@ inline ReadStatus ReadPage(Bus& bus, std::span<const uint8_t, 8> rom, uint16_t o
         return ReadStatus::kCrcError;
     for (unsigned i = 0; i < output.size(); ++i) output[i] = frame[i + 3];
     return ReadStatus::kOk;
+}
+
+inline ReadStatus WritePage(Bus& bus, std::span<const uint8_t, 8> rom, uint16_t offset,
+                            std::span<const uint8_t, 8> password,
+                            std::span<const uint8_t, 64> data) {
+    if (rom[0] != 0x37) return ReadStatus::kUnsupported;
+    if ((offset & 63U) != 0U || offset >= 4096U || Crc8(rom) != 0U) return ReadStatus::kInvalidRange;
+    auto select = [&]() {
+        bool present = false;
+        if (!bus.Reset(present)) return ReadStatus::kBusError;
+        if (!present) return ReadStatus::kNoDevice;
+        if (!bus.Write(0x55)) return ReadStatus::kBusError;
+        for (auto byte : rom) if (!bus.Write(byte)) return ReadStatus::kBusError;
+        return ReadStatus::kOk;
+    };
+
+    auto status = select();
+    if (status != ReadStatus::kOk) return status;
+    const uint8_t ta1 = static_cast<uint8_t>(offset);
+    const uint8_t ta2 = static_cast<uint8_t>(offset >> 8U);
+    if (!bus.Write(0x0F) || !bus.Write(ta1) || !bus.Write(ta2)) return ReadStatus::kBusError;
+    for (auto byte : data) if (!bus.Write(byte)) return ReadStatus::kBusError;
+    uint8_t write_crc[2]{};
+    if (!bus.Read(write_crc[0]) || !bus.Read(write_crc[1])) return ReadStatus::kBusError;
+    uint8_t write_frame[67]{0x0F, ta1, ta2};
+    for (unsigned i = 0; i < data.size(); ++i) write_frame[3U + i] = data[i];
+    const uint16_t expected_write_crc = static_cast<uint16_t>(~Crc16(write_frame));
+    if (write_crc[0] != static_cast<uint8_t>(expected_write_crc) ||
+        write_crc[1] != static_cast<uint8_t>(expected_write_crc >> 8U)) return ReadStatus::kCrcError;
+
+    status = select();
+    if (status != ReadStatus::kOk) return status;
+    if (!bus.Write(0xAA)) return ReadStatus::kBusError;
+    uint8_t scratch_header[3]{};
+    if (!bus.Read(scratch_header[0]) || !bus.Read(scratch_header[1]) || !bus.Read(scratch_header[2]))
+        return ReadStatus::kBusError;
+    uint8_t scratch_data[64]{};
+    for (auto& byte : scratch_data) if (!bus.Read(byte)) return ReadStatus::kBusError;
+    uint8_t scratch_crc[2]{};
+    if (!bus.Read(scratch_crc[0]) || !bus.Read(scratch_crc[1])) return ReadStatus::kBusError;
+    uint8_t scratch_frame[68]{0xAA, scratch_header[0], scratch_header[1], scratch_header[2]};
+    for (unsigned i = 0; i < sizeof(scratch_data); ++i) scratch_frame[4U + i] = scratch_data[i];
+    const uint16_t expected_scratch_crc = static_cast<uint16_t>(~Crc16(scratch_frame));
+    if (scratch_crc[0] != static_cast<uint8_t>(expected_scratch_crc) ||
+        scratch_crc[1] != static_cast<uint8_t>(expected_scratch_crc >> 8U)) return ReadStatus::kCrcError;
+    if (scratch_header[0] != ta1 || scratch_header[1] != ta2 || (scratch_header[2] & 0xC0U) != 0U ||
+        !std::equal(data.begin(), data.end(), scratch_data)) return ReadStatus::kCrcError;
+
+    status = select();
+    if (status != ReadStatus::kOk) return status;
+    if (!bus.Write(0x99) || !bus.Write(scratch_header[0]) || !bus.Write(scratch_header[1]) ||
+        !bus.Write(scratch_header[2])) return ReadStatus::kBusError;
+    for (unsigned i = 0; i < password.size(); ++i)
+        if (!bus.Write(password[i], i == password.size() - 1U ? 25000U : 0U)) return ReadStatus::kBusError;
+    uint8_t ack = 0xFF;
+    if (!bus.Read(ack)) return ReadStatus::kBusError;
+    if (ack != 0xAA) return ReadStatus::kCrcError;
+
+    std::array<uint8_t, 64> verify{};
+    status = ReadPage(bus, rom, offset, password, verify);
+    if (status != ReadStatus::kOk) return status;
+    return std::equal(data.begin(), data.end(), verify.begin()) ? ReadStatus::kOk : ReadStatus::kCrcError;
 }
 
 }  // namespace micropixel::platform::onewire

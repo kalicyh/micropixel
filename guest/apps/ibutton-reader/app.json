@@ -1,9 +1,28 @@
 {
   "schema_version": 1,
   "app_id": "micropixel.ibutton-reader",
-  "version": "0.1.2",
+  "version": "0.3.0",
   "threading": "none",
-  "title": "iButton Reader",
+  "title": {
+    "default": "en",
+    "values": {
+      "en": "iButton Reader",
+      "zh-CN": "iButton 读卡器",
+      "zh-TW": "iButton 讀取器",
+      "ja-JP": "iButton リーダー",
+      "ko-KR": "iButton 리더"
+    }
+  },
+  "localization": {
+    "default": "en",
+    "translations": {
+      "en": "i18n/en.json",
+      "zh-CN": "i18n/zh-CN.json",
+      "zh-TW": "i18n/zh-TW.json",
+      "ja-JP": "i18n/ja-JP.json",
+      "ko-KR": "i18n/ko-KR.json"
+    }
+  },
   "sources": [
     "main.cpp"
   ],

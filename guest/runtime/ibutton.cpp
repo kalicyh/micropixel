@@ -42,4 +42,17 @@ Result<IButtonPage> IButton::Read(const std::array<uint8_t, 8>& rom, uint16_t of
     runtime::CopyBytes(request.password, password.data(), 8);
     return Call(MICROPIXEL_IBUTTON_READ, request);
 }
+Result<IButtonPage> IButton::Write(const std::array<uint8_t, 8>& rom, uint16_t offset,
+                                   const std::array<uint8_t, 64>& data,
+                                   const std::array<uint8_t, 8>& password) const {
+    if ((offset % 64U) != 0U || offset >= 4096U) return unexpected(Error{ErrorCode::kInvalidArgument});
+    micropixel_ibutton_request_t request{};
+    request.size = sizeof(request);
+    request.offset = offset;
+    request.length = 64;
+    runtime::CopyBytes(request.rom, rom.data(), 8);
+    runtime::CopyBytes(request.password, password.data(), 8);
+    runtime::CopyBytes(request.data, data.data(), data.size());
+    return Call(MICROPIXEL_IBUTTON_WRITE, request);
+}
 }  // namespace micropixel

@@ -186,9 +186,25 @@ ServiceDescriptor IButtonServiceEndpoint::Describe() const {
 int32_t IButtonServiceEndpoint::Call(uint32_t method, const uint8_t* request, uint32_t request_size, uint8_t* response,
                                      uint32_t capacity, uint32_t& size_out) {
     micropixel_ibutton_request_t wire{};
-    if (method != MICROPIXEL_IBUTTON_SCAN && method != MICROPIXEL_IBUTTON_READ) return MICROPIXEL_STATUS_UNSUPPORTED;
-    if (!ReadRequest(request, request_size, wire)) return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    if (method != MICROPIXEL_IBUTTON_SCAN && method != MICROPIXEL_IBUTTON_READ &&
+        method != MICROPIXEL_IBUTTON_WRITE) return MICROPIXEL_STATUS_UNSUPPORTED;
+    if (method == MICROPIXEL_IBUTTON_WRITE) {
+        if (!ReadRequest(request, request_size, wire)) return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    } else if (request_size == sizeof(micropixel_ibutton_read_request_t)) {
+        micropixel_ibutton_read_request_t legacy{};
+        if (!ReadRequest(request, request_size, legacy)) return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+        wire.size = sizeof(wire);
+        wire.offset = legacy.offset;
+        wire.length = legacy.length;
+        std::copy(std::begin(legacy.rom), std::end(legacy.rom), std::begin(wire.rom));
+        std::copy(std::begin(legacy.password), std::end(legacy.password), std::begin(wire.password));
+    } else if (!ReadRequest(request, request_size, wire)) {
+        return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    }
     if (method == MICROPIXEL_IBUTTON_READ && (wire.length == 0 || wire.length > 64))
+        return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    if (method == MICROPIXEL_IBUTTON_WRITE &&
+        (wire.length != 64U || wire.offset >= 4096U || (wire.offset % 64U) != 0U))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;
     if (method == MICROPIXEL_IBUTTON_SCAN && (wire.length != 0 || wire.offset != 0))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;

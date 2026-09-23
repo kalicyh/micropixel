@@ -28,6 +28,9 @@ class IButton final {
     [[nodiscard]] Result<IButtonPage> Scan() const;
     [[nodiscard]] Result<IButtonPage> Read(const std::array<uint8_t, 8>& rom, uint16_t offset, uint16_t length,
                                            const std::array<uint8_t, 8>& password) const;
+    [[nodiscard]] Result<IButtonPage> Write(const std::array<uint8_t, 8>& rom, uint16_t offset,
+                                            const std::array<uint8_t, 64>& data,
+                                            const std::array<uint8_t, 8>& password) const;
 
    private:
     struct CapabilityToken final {

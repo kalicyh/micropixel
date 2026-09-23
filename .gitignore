@@ -41,3 +41,5 @@ CMakeUserPresets.json
 
 # Local Maze Evil art sources; the SDK example ships prepared assets.
 /guest/apps/maze-evil/assets/source/
+# Private DS1977 factory data generated only for local station bundles.
+/guest/apps/ibutton-reader/factory_catalog.generated.hpp

@@ -81,11 +81,11 @@ class Connection final : public Bus {
         present = (status & 2U) != 0;
         return true;
     }
-    bool Write(uint8_t byte, bool strong = false) override {
+    bool Write(uint8_t byte, uint32_t strong_pullup_us = 0U) override {
         uint8_t command[]{0xA5, byte}, status = 0;
-        if (!Configure(strong ? 5 : 1) || !Tx(command) || !Wait(status)) return false;
-        if (strong) {
-            esp_rom_delay_us(3000);
+        if (!Configure(strong_pullup_us != 0U ? 5 : 1) || !Tx(command) || !Wait(status)) return false;
+        if (strong_pullup_us != 0U) {
+            esp_rom_delay_us(strong_pullup_us);
             return Configure(1);
         }
         return true;
@@ -129,8 +129,12 @@ class Connection final : public Bus {
 }  // namespace
 int32_t Ds2484Reader::Call(uint32_t method, const micropixel_ibutton_request_t& request,
                            micropixel_ibutton_response_t& response) {
-    if (method != MICROPIXEL_IBUTTON_SCAN && method != MICROPIXEL_IBUTTON_READ) return MICROPIXEL_STATUS_UNSUPPORTED;
+    if (method != MICROPIXEL_IBUTTON_SCAN && method != MICROPIXEL_IBUTTON_READ &&
+        method != MICROPIXEL_IBUTTON_WRITE) return MICROPIXEL_STATUS_UNSUPPORTED;
     if (method == MICROPIXEL_IBUTTON_READ && (request.length == 0 || request.length > 64))
+        return MICROPIXEL_STATUS_INVALID_ARGUMENT;
+    if (method == MICROPIXEL_IBUTTON_WRITE &&
+        (request.length != 64U || request.offset >= 4096U || (request.offset % 64U) != 0U))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;
     struct Candidate final {
         micropixel_device_id_t device{};
@@ -178,8 +182,14 @@ int32_t Ds2484Reader::Call(uint32_t method, const micropixel_ibutton_request_t& 
             }
         }
         if (status == ReadStatus::kOk) {
-            status = ReadPage(connection, request.rom, request.offset, request.password,
-                              {response.data, request.length});
+            if (method == MICROPIXEL_IBUTTON_READ) {
+                status = ReadPage(connection, request.rom, request.offset, request.password,
+                                  {response.data, request.length});
+            } else {
+                std::array<uint8_t, 64> data{};
+                std::copy_n(request.data, data.size(), data.begin());
+                status = WritePage(connection, request.rom, request.offset, request.password, data);
+            }
         }
         if (status == ReadStatus::kOk)
             response.length = request.length;

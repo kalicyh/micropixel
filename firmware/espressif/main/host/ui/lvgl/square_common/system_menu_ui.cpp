@@ -268,15 +268,17 @@ void SystemMenuUi::Update(const host_ui::SystemMenuModel& model) {
         esp_lv_adapter_unlock();
         return;
     }
-    if (wifi_detail_label_ == nullptr || remote_control_detail_label_ == nullptr ||
-        system_information_detail_label_ == nullptr || appearance_detail_label_ == nullptr ||
+    if (wifi_detail_label_ == nullptr || system_information_detail_label_ == nullptr ||
+        appearance_detail_label_ == nullptr ||
         firmware_update_dot_ == nullptr || display_ == nullptr || esp_lv_adapter_lock(-1) != ESP_OK) {
         return;
     }
     const host_strings::Catalog strings = host_strings::ForTag(model.locale);
     lv_label_set_text(wifi_detail_label_, WifiDetail(model, strings));
     if (cellular_detail_label_) lv_label_set_text(cellular_detail_label_, CellularDetail(model, strings));
-    lv_label_set_text(remote_control_detail_label_, RemoteControlDetail(model, strings));
+    if (remote_control_detail_label_ != nullptr) {
+        lv_label_set_text(remote_control_detail_label_, RemoteControlDetail(model, strings));
+    }
     if (power_management_detail_label_ != nullptr) {
         lv_label_set_text(power_management_detail_label_, PowerManagementDetail(model).data());
     }
@@ -630,9 +632,6 @@ std::expected<void, host_ui::SystemUiError> SystemMenuUi::ShowLocked(lv_obj_t* r
                     strings.Get(host_strings::Id::kCellularTitle), CellularDetail(model, strings), theme::kAccent,
                     true);
         }
-        DrawRow(scroll_content_, 1U, host_ui::SystemMenuItem::kRemoteControl, LV_SYMBOL_REFRESH,
-                strings.Get(host_strings::Id::kSystemSettingsRemoteControl), RemoteControlDetail(model, strings),
-                theme::kPositive, true);
         const auto firmware_detail = FirmwareDetail(model);
         DrawRow(scroll_content_, 2U, host_ui::SystemMenuItem::kSystemInformation, "i",
                 strings.Get(host_strings::Id::kSystemSettingsSystemInformation), firmware_detail.data(),

@@ -67,15 +67,15 @@ Normal development commands:
                                      rebuild or touch the app_store partition.
   monitor [PORT]                     Monitor the running ESP32-P4 Host without
                                      building, flashing, erasing, or testing.
-  build-apps                         Build SDK Demo, Snake, Maze Evil, Blocks, Tilt, and Tomb Explorer Bundles.
-  flash-apps [PORT]                  Clear app_store and flash six example Apps
+  build-apps                         Build SDK Demo, Snake, Maze Evil, Blocks, Tilt, Jump Jump, and Gravity Balls Bundles.
+  flash-apps [PORT]                  Clear app_store and flash seven example Apps
                                      over USB. Uses the unique connected ESP32-P4
                                      when PORT is omitted.
 
 Explicit full/destructive commands:
   fullclean-host                     Delete the Host build cache with idf.py fullclean.
   flash-all [PORT]                   Build and flash the Host, then clear and flash
-                                     six example Apps. Run no tests.
+                                     seven example Apps. Run no tests.
   reset-app-store [PORT]             Recovery only: clear app_store to an EMPTY Catalog.
   install-apps-examples              Non-USB alternative: install examples through
                                      Remote Control while preserving other Apps.
@@ -498,9 +498,9 @@ monitor_host() {
 }
 
 build_example_apps() {
-    echo "==> Building six example Apps"
+    echo "==> Building seven example Apps"
     local app_name
-    for app_name in sdk-demo snake maze-evil blocks tilt tomb-explorer; do
+    for app_name in sdk-demo snake maze-evil blocks tilt jump-jump gravity-balls; do
         build_app_package "$app_name"
     done
 }
@@ -525,7 +525,8 @@ create_example_app_store_image() {
         "$workspace_root/build/apps/maze-evil/maze-evil.bundle.bin"
         "$workspace_root/build/apps/blocks/blocks.bundle.bin"
         "$workspace_root/build/apps/tilt/tilt.bundle.bin"
-        "$workspace_root/build/apps/tomb-explorer/tomb-explorer.bundle.bin"
+        "$workspace_root/build/apps/jump-jump/jump-jump.bundle.bin"
+        "$workspace_root/build/apps/gravity-balls/gravity-balls.bundle.bin"
     )
     local bundle
     for bundle in "${bundles[@]}"; do
@@ -561,7 +562,7 @@ write_app_store_image() {
 }
 
 prepare_full_flash() {
-    echo "==> Building Host + six example Apps + App Store image (no tests, no flash)"
+    echo "==> Building Host + seven example Apps + App Store image (no tests, no flash)"
     build_example_apps
     build_host
     create_example_app_store_image
@@ -572,7 +573,7 @@ prepare_full_flash() {
         echo "App Store image is larger than app_store ($image_size > $partition_size)." >&2
         return 2
     fi
-    echo "==> App Store image ready: $example_app_store_image (6 Apps)"
+    echo "==> App Store image ready: $example_app_store_image (7 Apps)"
 }
 
 flash_all() {
@@ -583,9 +584,9 @@ flash_all() {
     port="$(resolve_port "$requested_port")"
     echo "==> Flashing Host at $baud baud"
     idf_host metalio-claw4 flash --baud "$baud" --port "$port"
-    echo "==> Clearing app_store and flashing six example Apps"
+    echo "==> Clearing app_store and flashing seven example Apps"
     write_app_store_image "$port" "$example_app_store_image" true
-    echo "System Shell P4 flashed on $port with six Apps."
+    echo "System Shell P4 flashed on $port with seven Apps."
     echo "Verify with: bash tools/p4.sh monitor $port (expect 'System Shell ready: App Hall rendered')"
 }
 
@@ -674,7 +675,8 @@ run_tests() {
         "$workspace_root/build/apps/snake/snake.bundle.bin" \
         "$workspace_root/build/apps/maze-evil/maze-evil.bundle.bin" \
         "$workspace_root/build/apps/tilt/tilt.bundle.bin" \
-        "$workspace_root/build/apps/tomb-explorer/tomb-explorer.bundle.bin" \
+        "$workspace_root/build/apps/jump-jump/jump-jump.bundle.bin" \
+        "$workspace_root/build/apps/gravity-balls/gravity-balls.bundle.bin" \
         "$workspace_root/build/apps/sdk-demo/sdk-demo.bundle.bin"
     bash -n "$workspace_root"/tools/*.sh
     echo "P4 release/pre-push test suite passed."
@@ -686,7 +688,7 @@ flash_example_apps() {
     require_idf
     create_example_app_store_image
     port="$(resolve_port "$requested_port")"
-    echo "==> USB App flash: clearing app_store and writing six example Apps"
+    echo "==> USB App flash: clearing app_store and writing seven example Apps"
     write_app_store_image "$port" "$example_app_store_image"
 }
 

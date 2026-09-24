@@ -29,6 +29,9 @@ constexpr char kHex[] = "0123456789ABCDEF";
 constexpr unsigned kDefaultReadBytes = 0x0098U;
 constexpr unsigned kFourKilobytes = 4096U;
 constexpr unsigned kFullDeviceBytes = 32768U;
+constexpr unsigned kDataBytesPerRow = 12U;
+constexpr unsigned kDataRowsPerPage = 8U;
+constexpr unsigned kDataBytesPerPage = kDataBytesPerRow * kDataRowsPerPage;
 constexpr uint8_t kDs1977FamilyCode = 0x37U;
 constexpr uint8_t kDs1991FamilyCode = 0x02U;
 constexpr unsigned kDs1991DataBytes = 144U;
@@ -131,14 +134,14 @@ int main() {
     auto key_cancel = button(password_view, {40, 635, 640, 44}, strings.Get(StringId::kButtonBackArrow), kPale,
                              kBlue, 16U, SystemFont::kSmall);
 
-    // Data view: identity, optional similarity match, and the selected 64-byte display page.
+    // Data view: identity, optional similarity match, and the selected 96-byte display page.
     auto data_back = button(data_view, {12, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U);
     auto data_title = data_view.CreateLabel({360, 30}, "—", kInk, SystemFont::kLarge, true).value();
     label(data_view, 40, 444, strings.Get(StringId::kMatchCaption), kSecondary, SystemFont::kSmall);
     auto match_name = label(data_view, 40, 468, "—", kInk, SystemFont::kLarge);
-    std::array<LabelNode, 8> data_rows;
+    std::array<LabelNode, kDataRowsPerPage> data_rows;
     for (unsigned i = 0; i < data_rows.size(); ++i)
-        data_rows[i] = label(data_view, 40, 218 + static_cast<int>(i) * 28, " ", kInk, SystemFont::kMedium);
+        data_rows[i] = label(data_view, 40, 120 + static_cast<int>(i) * 42, " ", kInk, SystemFont::kLarge);
     auto data_page = data_view.CreateLabel({625, 456}, "1 / 64", kSecondary, SystemFont::kSmall, true).value();
     auto data_previous = button(data_view, {390, 488, 130, 46}, strings.Get(StringId::kButtonPrevious), kPale, kBlue,
                                 16U, SystemFont::kSmall);
@@ -255,22 +258,23 @@ int main() {
     };
     auto update_data_rows = [&] {
         for (unsigned row = 0; row < data_rows.size(); ++row) {
-            const auto offset = static_cast<uint16_t>(display_page * 64U + row * 8U);
-            if (offset + 8U > loaded_bytes) {
+            const auto offset = static_cast<uint16_t>(display_page * kDataBytesPerPage + row * kDataBytesPerRow);
+            if (offset >= loaded_bytes) {
                 data_rows[row].SetText(" ");
                 continue;
             }
             FixedString<64> line;
             AppendHexWord(line, offset);
             line.Append("  ");
-            for (unsigned column = 0; column < 8; ++column) {
+            const auto row_bytes = std::min(kDataBytesPerRow, loaded_bytes - offset);
+            for (unsigned column = 0; column < row_bytes; ++column) {
                 AppendHexByte(line, device_data[offset + column]);
-                if (column != 7) line.Append(" ");
+                if (column + 1U != row_bytes) line.Append(" ");
             }
             data_rows[row].SetText(line.c_str());
         }
         FixedString<24> page;
-        const unsigned page_count = (loaded_bytes + 63U) / 64U;
+        const unsigned page_count = (loaded_bytes + kDataBytesPerPage - 1U) / kDataBytesPerPage;
         page.AppendUint(display_page + 1U);
         page.Append(" / ");
         page.AppendUint(page_count == 0U ? 1U : page_count);
@@ -395,7 +399,7 @@ int main() {
                     show_home_hint(StringId::kPasswordHint);
                     full_read_home_button.SetVisible(false);
                     home_card.SetEnabled(true);
-                    (void)data_choose.SetText(strings.Get(StringId::kButtonChangeKey));
+                    (void)data_choose.SetText(strings.Get(StringId::kButtonChooseData));
                     data_choose.SetEnabled(false);
                     show_ds1991_auth_choice();
                 } else {
@@ -420,7 +424,7 @@ int main() {
                     loaded_bytes = auth_bytes;
                     if (rom[0] == kDs1991FamilyCode) {
                         data_status.SetText(strings.Get(StringId::kWarningDs1991));
-                        (void)data_choose.SetText(strings.Get(StringId::kButtonChangeKey));
+                        (void)data_choose.SetText(strings.Get(StringId::kButtonChooseData));
                     }
                     data_choose.SetEnabled(true);
                     start_read(quick_read_bytes(), true);
@@ -610,7 +614,7 @@ int main() {
                     --display_page;
                     update_data_rows();
                 }
-                const unsigned page_count = (loaded_bytes + 63U) / 64U;
+                const unsigned page_count = (loaded_bytes + kDataBytesPerPage - 1U) / kDataBytesPerPage;
                 if (data_next.OnTouch(*touch).clicked && display_page + 1U < page_count) {
                     ++display_page;
                     update_data_rows();
@@ -624,12 +628,11 @@ int main() {
                     data_status.SetText(strings.Get(StringId::kStatusMatching));
                 }
                 if (data_choose.OnTouch(*touch).clicked) {
-                    if (rom[0] == kDs1991FamilyCode) show_ds1991_auth_choice();
-                    else {
-                        picker_page_index = 0;
-                        update_dataset_list();
-                        set_screen(Screen::kPicker);
-                    }
+                    // Authentication is selected from the home card each time for DS1991.
+                    // Keep the data picker independent so its button always opens the catalog.
+                    picker_page_index = 0;
+                    update_dataset_list();
+                    set_screen(Screen::kPicker);
                 }
             } else if (screen == Screen::kHome) {
                 if (home_card.OnTouch(*touch).clicked && job == Job::kIdle && device_present) {

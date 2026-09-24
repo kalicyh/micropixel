@@ -61,8 +61,8 @@ Normal development commands:
   build-host                         Incrementally build only the ESP32-P4 Host.
   build-null                         Compile the hardware-independent Null board
                                      in its own build directory; never flash it.
-  build-release                      Build Host, SDK Demo, Snake, Maze Evil, Blocks, Tilt, and Tomb Explorer; create a
-                                     browser-flashable micropixel-full.bin containing those six Apps.
+  build-release                      Build Host and iButton Reader; create a browser-flashable
+                                     micropixel-full.bin with only iButton Reader preinstalled.
   flash-host [PORT]                  Flash the already-built Host only; do not
                                      rebuild or touch the app_store partition.
   monitor [PORT]                     Monitor the running ESP32-P4 Host without
@@ -451,24 +451,14 @@ build_release() {
         echo "build-release refused: MICROPIXEL_REMOTE_CONTROL_HOST is empty (load the root .env, or set MICROPIXEL_RELEASE_ALLOW_OFFLINE=1 for an intentionally offline image)." >&2
         exit 2
     fi
-    echo "==> Building release Apps: SDK Demo, Snake, Maze Evil, Blocks, Tilt, and Tomb Explorer"
-    build_app_package sdk-demo
-    build_app_package snake
-    build_app_package maze-evil
-    build_app_package blocks
-    build_app_package tilt
-    build_app_package tomb-explorer
+    echo "==> Building release App: iButton Reader"
+    build_app_package ibutton-reader
     build_host
     mkdir -p "$system_shell_output_dir"
     python3 "$workspace_root/tools/build_app_store_image.py" \
         --output "$release_app_store_image" \
-        "$workspace_root/build/apps/sdk-demo/sdk-demo.bundle.bin" \
-        "$workspace_root/build/apps/snake/snake.bundle.bin" \
-        "$workspace_root/build/apps/maze-evil/maze-evil.bundle.bin" \
-        "$workspace_root/build/apps/blocks/blocks.bundle.bin" \
-        "$workspace_root/build/apps/tilt/tilt.bundle.bin" \
-        "$workspace_root/build/apps/tomb-explorer/tomb-explorer.bundle.bin"
-    echo "==> Creating browser-flashable image with SDK Demo, Snake, Maze Evil, Blocks, Tilt, and Tomb Explorer"
+        "$workspace_root/build/apps/ibutton-reader/ibutton-reader.bundle.bin"
+    echo "==> Creating browser-flashable image with iButton Reader only"
     python3 "$workspace_root/tools/build_full_firmware_image.py" \
         --build-dir "$host_build_dir" \
         --app-store-image "$release_app_store_image" \

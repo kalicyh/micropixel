@@ -58,6 +58,7 @@
   "factory.complete": "寫入與回讀驗證完成",
   "factory.failed": "寫入失敗，已停止",
   "factory.target_required": "請連接一顆 DS1977",
+  "factory.ds1991_note": "DS1991 請在資料頁點擊單行編輯並寫入。",
   "factory.confirm_target": "目標：",
   "factory.no_catalog": "請先封裝本機工廠資料目錄",
   "button.choose_data": "選擇資料",

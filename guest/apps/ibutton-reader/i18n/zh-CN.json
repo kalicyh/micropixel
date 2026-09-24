@@ -58,6 +58,7 @@
   "factory.complete": "写入并回读校验完成",
   "factory.failed": "写入失败，已停止",
   "factory.target_required": "请连接一颗 DS1977",
+  "factory.ds1991_note": "DS1991 请在数据页点击单行编辑并写入。",
   "factory.confirm_target": "目标：",
   "factory.no_catalog": "请先打包本地工厂数据目录",
   "button.choose_data": "选择数据",

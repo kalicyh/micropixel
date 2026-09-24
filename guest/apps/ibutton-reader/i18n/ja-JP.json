@@ -58,6 +58,7 @@
   "factory.complete": "書き込みと読み戻し検証が完了",
   "factory.failed": "書き込み失敗、停止しました",
   "factory.target_required": "DS1977 を1個接続してください",
+  "factory.ds1991_note": "DS1991 はデータ画面で行を編集して書き込んでください。",
   "factory.confirm_target": "対象：",
   "factory.no_catalog": "先にローカル工場データを同梱してください",
   "button.choose_data": "データ選択",

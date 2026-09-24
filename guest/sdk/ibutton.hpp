@@ -30,7 +30,8 @@ class IButton final {
                                            const std::array<uint8_t, 8>& password) const;
     [[nodiscard]] Result<IButtonPage> Write(const std::array<uint8_t, 8>& rom, uint16_t offset,
                                             const std::array<uint8_t, 64>& data,
-                                            const std::array<uint8_t, 8>& password) const;
+                                            const std::array<uint8_t, 8>& password,
+                                            uint16_t length = 64U) const;
 
    private:
     struct CapabilityToken final {

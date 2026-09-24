@@ -58,6 +58,7 @@
   "factory.complete": "쓰기 및 읽기 검증 완료",
   "factory.failed": "쓰기 실패, 중지됨",
   "factory.target_required": "DS1977 장치 하나를 연결하세요",
+  "factory.ds1991_note": "DS1991은 데이터 화면에서 행을 편집하고 기록하세요.",
   "factory.confirm_target": "대상: ",
   "factory.no_catalog": "먼저 로컬 공장 데이터 카탈로그를 패키징하세요",
   "button.choose_data": "데이터 선택",

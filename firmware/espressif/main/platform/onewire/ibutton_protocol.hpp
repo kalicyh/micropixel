@@ -68,7 +68,7 @@ inline ReadStatus Scan(Bus& bus, std::span<uint8_t, 8> rom) {
     return Crc8(rom) == 0 ? ReadStatus::kOk : ReadStatus::kCrcError;
 }
 
-// One bounded page/subkey per call. No write-memory/password commands exist here.
+// One bounded page/subkey per call.
 inline ReadStatus ReadPage(Bus& bus, std::span<const uint8_t, 8> rom, uint16_t offset,
                            std::span<const uint8_t, 8> password, std::span<uint8_t> output) {
     const bool ds1977 = rom[0] == 0x37;
@@ -117,8 +117,39 @@ inline ReadStatus ReadPage(Bus& bus, std::span<const uint8_t, 8> rom, uint16_t o
 
 inline ReadStatus WritePage(Bus& bus, std::span<const uint8_t, 8> rom, uint16_t offset,
                             std::span<const uint8_t, 8> password,
-                            std::span<const uint8_t, 64> data) {
+                            std::span<const uint8_t> data) {
+    if (data.empty() || data.size() > 64U) return ReadStatus::kInvalidRange;
+    if (rom[0] == 0x02) {
+        constexpr unsigned kDs1991Size = 144U;
+        constexpr unsigned kDs1991SubkeySize = 48U;
+        if (offset >= kDs1991Size || data.size() > kDs1991SubkeySize - offset % kDs1991SubkeySize ||
+            Crc8(rom) != 0U)
+            return ReadStatus::kInvalidRange;
+        bool present = false;
+        if (!bus.Reset(present)) return ReadStatus::kBusError;
+        if (!present) return ReadStatus::kNoDevice;
+        if (!bus.Write(0x55)) return ReadStatus::kBusError;
+        for (auto byte : rom)
+            if (!bus.Write(byte)) return ReadStatus::kBusError;
+        const uint8_t address = static_cast<uint8_t>((offset / kDs1991SubkeySize) * 64U + 16U +
+                                                     offset % kDs1991SubkeySize);
+        if (!bus.Write(0x99) || !bus.Write(address) || !bus.Write(static_cast<uint8_t>(~address)))
+            return ReadStatus::kBusError;
+        uint8_t public_id = 0;
+        for (unsigned i = 0; i < 8U; ++i)
+            if (!bus.Read(public_id)) return ReadStatus::kBusError;
+        for (auto byte : password)
+            if (!bus.Write(byte)) return ReadStatus::kBusError;
+        for (auto byte : data)
+            if (!bus.Write(byte)) return ReadStatus::kBusError;
+
+        std::array<uint8_t, 64> verify{};
+        const auto status = ReadPage(bus, rom, offset, password, {verify.data(), data.size()});
+        if (status != ReadStatus::kOk) return status;
+        return std::equal(data.begin(), data.end(), verify.begin()) ? ReadStatus::kOk : ReadStatus::kCrcError;
+    }
     if (rom[0] != 0x37) return ReadStatus::kUnsupported;
+    if (data.size() != 64U) return ReadStatus::kInvalidRange;
     if ((offset & 63U) != 0U || offset >= 4096U || Crc8(rom) != 0U) return ReadStatus::kInvalidRange;
     auto select = [&]() {
         bool present = false;

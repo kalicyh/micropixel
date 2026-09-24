@@ -58,6 +58,7 @@
   "factory.complete": "Write and readback complete",
   "factory.failed": "Write failed; stopped",
   "factory.target_required": "Connect one DS1977 device",
+  "factory.ds1991_note": "For DS1991, edit and write a row from the data page.",
   "factory.confirm_target": "Target: ",
   "factory.no_catalog": "Build a private catalog bundle first",
   "button.choose_data": "Choose data",

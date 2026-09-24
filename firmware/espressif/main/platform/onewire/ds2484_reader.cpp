@@ -134,7 +134,7 @@ int32_t Ds2484Reader::Call(uint32_t method, const micropixel_ibutton_request_t& 
     if (method == MICROPIXEL_IBUTTON_READ && (request.length == 0 || request.length > 64))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;
     if (method == MICROPIXEL_IBUTTON_WRITE &&
-        (request.length != 64U || request.offset >= 4096U || (request.offset % 64U) != 0U))
+        (request.length == 0U || request.length > 64U))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;
     struct Candidate final {
         micropixel_device_id_t device{};
@@ -186,9 +186,8 @@ int32_t Ds2484Reader::Call(uint32_t method, const micropixel_ibutton_request_t& 
                 status = ReadPage(connection, request.rom, request.offset, request.password,
                                   {response.data, request.length});
             } else {
-                std::array<uint8_t, 64> data{};
-                std::copy_n(request.data, data.size(), data.begin());
-                status = WritePage(connection, request.rom, request.offset, request.password, data);
+                status = WritePage(connection, request.rom, request.offset, request.password,
+                                   {request.data, request.length});
             }
         }
         if (status == ReadStatus::kOk)

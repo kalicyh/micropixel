@@ -44,12 +44,12 @@ Result<IButtonPage> IButton::Read(const std::array<uint8_t, 8>& rom, uint16_t of
 }
 Result<IButtonPage> IButton::Write(const std::array<uint8_t, 8>& rom, uint16_t offset,
                                    const std::array<uint8_t, 64>& data,
-                                   const std::array<uint8_t, 8>& password) const {
-    if ((offset % 64U) != 0U || offset >= 4096U) return unexpected(Error{ErrorCode::kInvalidArgument});
+                                   const std::array<uint8_t, 8>& password, uint16_t length) const {
+    if (length == 0U || length > data.size()) return unexpected(Error{ErrorCode::kInvalidArgument});
     micropixel_ibutton_request_t request{};
     request.size = sizeof(request);
     request.offset = offset;
-    request.length = 64;
+    request.length = length;
     runtime::CopyBytes(request.rom, rom.data(), 8);
     runtime::CopyBytes(request.password, password.data(), 8);
     runtime::CopyBytes(request.data, data.data(), data.size());

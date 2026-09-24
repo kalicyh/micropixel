@@ -124,7 +124,7 @@ int main() {
     [[clang::no_destroy]] static auto device_name =
         label(home, 48, 514, strings.Get(StringId::kIdNotScanned), kSecondary, SystemFont::kMedium);
     [[clang::no_destroy]] static auto home_detail =
-        label(home, 64, 405, strings.Get(StringId::kPasswordHint), kSecondary, SystemFont::kMedium);
+        label(home, 64, 405, " ", kSecondary, SystemFont::kMedium);
     home_detail.SetPosition({530, 514});
     home_detail.SetCentered(true);
     home_detail.SetFont(SystemFont::kSmall);
@@ -212,7 +212,8 @@ int main() {
     label(confirm_view, 40, 132, strings.Get(StringId::kConfirmTitle), kInk, SystemFont::kLarge);
     [[clang::no_destroy]] static auto confirm_name =
         label(confirm_view, 40, 226, strings.Get(StringId::kFactoryNoData), kBlue, SystemFont::kLarge);
-    label(confirm_view, 40, 310, strings.Get(StringId::kConfirmNote), kSecondary);
+    [[clang::no_destroy]] static auto confirm_note =
+        label(confirm_view, 40, 310, strings.Get(StringId::kConfirmNote), kSecondary);
     [[clang::no_destroy]] static auto confirm_status = label(confirm_view, 40, 390, " ", kSecondary);
     [[clang::no_destroy]] static auto confirm_full_write =
         button(confirm_view, {40, 570, 640, 76}, strings.Get(StringId::kFactoryFullWrite), kBlue, kWhite, 24U,
@@ -295,7 +296,8 @@ int main() {
         cursor_label.SetText(position.c_str());
     };
     auto begin_row_edit = [&](unsigned offset) {
-        if (rom[0] != kDs1977FamilyCode || offset + kDataBytesPerRow > 4096U ||
+        if ((rom[0] != kDs1977FamilyCode && rom[0] != kDs1991FamilyCode) ||
+            offset + kDataBytesPerRow > device_capacity() ||
             offset + kDataBytesPerRow > loaded_bytes)
             return;
         row_editing = true;
@@ -323,7 +325,8 @@ int main() {
     auto update_data_rows = [&] {
         for (unsigned row = 0; row < data_rows.size(); ++row) {
             const auto offset = static_cast<uint16_t>(display_page * kDataBytesPerPage + row * kDataBytesPerRow);
-            data_row_buttons[row].SetEnabled(rom[0] == kDs1977FamilyCode && offset + kDataBytesPerRow <= 4096U &&
+            data_row_buttons[row].SetEnabled((rom[0] == kDs1977FamilyCode || rom[0] == kDs1991FamilyCode) &&
+                                             offset + kDataBytesPerRow <= device_capacity() &&
                                              offset + kDataBytesPerRow <= loaded_bytes);
             if (offset >= loaded_bytes) {
                 data_rows[row].SetText(" ");
@@ -469,7 +472,7 @@ int main() {
                     home_card.SetEnabled(false);
                     full_read_home_button.SetEnabled(false);
                     full_read_home_button.SetVisible(true);
-                    show_home_hint(StringId::kPasswordHint);
+                    home_detail.SetText(" ");
                     if (screen == Screen::kData || screen == Screen::kPicker || screen == Screen::kConfirm ||
                         screen == Screen::kPassword || screen == Screen::kDs1991AuthChoice)
                         set_screen(Screen::kHome);
@@ -495,7 +498,7 @@ int main() {
                     home_detail.SetText(strings.Get(StringId::kStatusTryingA));
                 } else if (rom[0] == kDs1991FamilyCode) {
                     (void)home_card.SetText(strings.Get(StringId::kConnectionConnected));
-                    show_home_hint(StringId::kPasswordHint);
+                    home_detail.SetText(" ");
                     full_read_home_button.SetVisible(false);
                     home_card.SetEnabled(true);
                     (void)data_choose.SetText(strings.Get(StringId::kButtonChooseData));
@@ -528,6 +531,8 @@ int main() {
                         data_status.SetText(strings.Get(StringId::kWarningDs1991));
                         (void)data_choose.SetText(strings.Get(StringId::kButtonChooseData));
                     }
+                    // Factory catalog images are 4 KiB DS1977 dumps; DS1991 is
+                    // edited and written one 8-byte row at a time instead.
                     data_choose.SetEnabled(true);
                     start_read(quick_read_bytes(), true);
                     set_screen(Screen::kHome);
@@ -601,7 +606,7 @@ int main() {
                         home_detail.SetPosition({64, 405});
                         home_detail.SetCentered(false);
                         home_detail.SetFont(SystemFont::kMedium);
-                        data_status.SetText(rom[0] == kDs1977FamilyCode ? strings.Get(StringId::kRowEditTapHint) : " ");
+                        data_status.SetText(strings.Get(StringId::kRowEditTapHint));
                         match_button.SetEnabled(loaded_bytes != 0U);
                         full_read_home_button.SetVisible(rom[0] != kDs1991FamilyCode);
                         full_read_home_button.SetEnabled(rom[0] != kDs1991FamilyCode &&
@@ -634,7 +639,7 @@ int main() {
                     match_summary.Append("%");
                     match_name.SetText(match_summary.c_str());
                     picker_hint.SetText(match_summary.c_str());
-                    data_status.SetText(rom[0] == kDs1977FamilyCode ? strings.Get(StringId::kRowEditTapHint) : " ");
+                    data_status.SetText(strings.Get(StringId::kRowEditTapHint));
                 } else {
                     FixedString<48> progress;
                     progress.Append(strings.Get(StringId::kStatusMatching));
@@ -669,39 +674,58 @@ int main() {
                     confirm_status.SetText(progress.c_str());
                 }
             } else if (job == Job::kRowReadFirst || job == Job::kRowReadSecond) {
-                const bool second = job == Job::kRowReadSecond;
-                const unsigned page_index = second ? 1U : 0U;
-                const unsigned page_offset = (row_edit_offset / 64U + page_index) * 64U;
-                const auto result = app.ibutton().Read(rom, static_cast<uint16_t>(page_offset), 64U, active_password);
-                if (!result || result->status != IButtonStatus::kOk) {
-                    finish_row_edit(false);
-                } else {
-                    row_edit_pages[page_index] = result->data;
-                    if (!second && row_crosses_page) {
-                        job = Job::kRowReadSecond;
+                if (rom[0] == kDs1991FamilyCode) {
+                    const auto result = app.ibutton().Read(rom, static_cast<uint16_t>(row_edit_offset),
+                                                           kDataBytesPerRow, active_password);
+                    if (!result || result->status != IButtonStatus::kOk) {
+                        finish_row_edit(false);
                     } else {
-                        const unsigned first_page_offset = (row_edit_offset / 64U) * 64U;
-                        for (unsigned i = 0; i < row_edit_data.size(); ++i) {
-                            const unsigned relative = row_edit_offset + i - first_page_offset;
-                            const unsigned target_page = relative / 64U;
-                            row_edit_pages[target_page][relative % 64U] = row_edit_data[i];
-                        }
                         job = Job::kRowWriteFirst;
                         data_status.SetText(strings.Get(StringId::kRowEditWriting));
                     }
+                } else {
+                    const bool second = job == Job::kRowReadSecond;
+                    const unsigned page_index = second ? 1U : 0U;
+                    const unsigned page_offset = (row_edit_offset / 64U + page_index) * 64U;
+                    const auto result = app.ibutton().Read(rom, static_cast<uint16_t>(page_offset), 64U, active_password);
+                    if (!result || result->status != IButtonStatus::kOk) {
+                        finish_row_edit(false);
+                    } else {
+                        row_edit_pages[page_index] = result->data;
+                        if (!second && row_crosses_page) {
+                            job = Job::kRowReadSecond;
+                        } else {
+                            const unsigned first_page_offset = (row_edit_offset / 64U) * 64U;
+                            for (unsigned i = 0; i < row_edit_data.size(); ++i) {
+                                const unsigned relative = row_edit_offset + i - first_page_offset;
+                                const unsigned target_page = relative / 64U;
+                                row_edit_pages[target_page][relative % 64U] = row_edit_data[i];
+                            }
+                            job = Job::kRowWriteFirst;
+                            data_status.SetText(strings.Get(StringId::kRowEditWriting));
+                        }
+                    }
                 }
             } else if (job == Job::kRowWriteFirst || job == Job::kRowWriteSecond) {
-                const bool second = job == Job::kRowWriteSecond;
-                const unsigned page_index = second ? 1U : 0U;
-                const unsigned page_offset = (row_edit_offset / 64U + page_index) * 64U;
-                const auto result = app.ibutton().Write(rom, static_cast<uint16_t>(page_offset),
-                                                        row_edit_pages[page_index], active_password);
-                if (!result || result->status != IButtonStatus::kOk) {
-                    finish_row_edit(false);
-                } else if (!second && row_crosses_page) {
-                    job = Job::kRowWriteSecond;
+                if (rom[0] == kDs1991FamilyCode) {
+                    std::array<uint8_t, 64> data{};
+                    std::copy(row_edit_data.begin(), row_edit_data.end(), data.begin());
+                    const auto result = app.ibutton().Write(rom, static_cast<uint16_t>(row_edit_offset), data,
+                                                            active_password, kDataBytesPerRow);
+                    finish_row_edit(result && result->status == IButtonStatus::kOk);
                 } else {
-                    finish_row_edit(true);
+                    const bool second = job == Job::kRowWriteSecond;
+                    const unsigned page_index = second ? 1U : 0U;
+                    const unsigned page_offset = (row_edit_offset / 64U + page_index) * 64U;
+                    const auto result = app.ibutton().Write(rom, static_cast<uint16_t>(page_offset),
+                                                            row_edit_pages[page_index], active_password);
+                    if (!result || result->status != IButtonStatus::kOk) {
+                        finish_row_edit(false);
+                    } else if (!second && row_crosses_page) {
+                        job = Job::kRowWriteSecond;
+                    } else {
+                        finish_row_edit(true);
+                    }
                 }
             }
         }
@@ -737,7 +761,10 @@ int main() {
                     if (!scan || scan->status != IButtonStatus::kOk || scan->rom != rom) {
                         finish_row_edit(false);
                     } else {
-                        row_crosses_page = (row_edit_offset / 64U) != ((row_edit_offset + kDataBytesPerRow - 1U) / 64U);
+                        row_crosses_page = rom[0] == kDs1991FamilyCode
+                                               ? false
+                                               : (row_edit_offset / 64U) !=
+                                                     ((row_edit_offset + kDataBytesPerRow - 1U) / 64U);
                         job = Job::kRowReadFirst;
                         data_status.SetText(strings.Get(StringId::kRowEditReading));
                     }
@@ -755,7 +782,7 @@ int main() {
                         if (device_present && rom[0] == kDs1991FamilyCode) {
                             (void)home_card.SetText(strings.Get(StringId::kConnectionConnected));
                             home_card.SetEnabled(true);
-                            show_home_hint(StringId::kPasswordHint);
+                            home_detail.SetText(" ");
                         }
                         set_screen(Screen::kHome);
                     }
@@ -841,6 +868,10 @@ int main() {
                     if (index < ibutton_reader::kFactoryCatalog.size() && dataset_buttons[i].OnTouch(*touch).clicked) {
                         dataset_index = index;
                         confirm_name.SetText(ibutton_reader::kFactoryCatalog[index].name);
+                        const bool ds1977 = rom[0] == kDs1977FamilyCode;
+                        confirm_note.SetText(strings.Get(ds1977 ? StringId::kConfirmNote :
+                                                                  StringId::kFactoryDs1991Note));
+                        confirm_full_write.SetEnabled(ds1977);
                         confirm_status.SetText(" ");
                         set_screen(Screen::kConfirm);
                     }
@@ -864,13 +895,17 @@ int main() {
                 }
                 if (confirm_full_write.OnTouch(*touch).clicked && job == Job::kIdle && device_present &&
                     authenticated) {
-                    const auto scan = app.ibutton().Scan();
-                    if (scan && scan->status == IButtonStatus::kOk && scan->rom == rom) {
-                        write_page = 0;
-                        job = Job::kWrite;
-                        confirm_status.SetText(strings.Get(StringId::kStatusWriting));
-                    } else {
+                    if (rom[0] != kDs1977FamilyCode) {
                         confirm_status.SetText(strings.Get(StringId::kFactoryTargetRequired));
+                    } else {
+                        const auto scan = app.ibutton().Scan();
+                        if (scan && scan->status == IButtonStatus::kOk && scan->rom == rom) {
+                            write_page = 0;
+                            job = Job::kWrite;
+                            confirm_status.SetText(strings.Get(StringId::kStatusWriting));
+                        } else {
+                            confirm_status.SetText(strings.Get(StringId::kFactoryTargetRequired));
+                        }
                     }
                 }
             }

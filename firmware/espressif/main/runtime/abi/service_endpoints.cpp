@@ -204,7 +204,7 @@ int32_t IButtonServiceEndpoint::Call(uint32_t method, const uint8_t* request, ui
     if (method == MICROPIXEL_IBUTTON_READ && (wire.length == 0 || wire.length > 64))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;
     if (method == MICROPIXEL_IBUTTON_WRITE &&
-        (wire.length != 64U || wire.offset >= 4096U || (wire.offset % 64U) != 0U))
+        (wire.length == 0U || wire.length > 64U))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;
     if (method == MICROPIXEL_IBUTTON_SCAN && (wire.length != 0 || wire.offset != 0))
         return MICROPIXEL_STATUS_INVALID_ARGUMENT;

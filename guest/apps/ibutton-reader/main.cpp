@@ -59,8 +59,22 @@ void AppendHexWord(FixedString<Capacity>& output, uint16_t value) {
     AppendHexByte(output, static_cast<uint8_t>(value));
 }
 
-enum class Screen { kHome, kPassword, kData, kPicker, kConfirm, kFullReadPrompt, kDs1991AuthChoice };
-enum class Job { kIdle, kAuthAlpha, kAuthBeta, kAuthManual, kAuthDs1991Alpha, kAuthDs1991Beta, kRead, kMatch, kWrite };
+enum class Screen { kHome, kPassword, kRowEdit, kData, kPicker, kConfirm, kFullReadPrompt, kDs1991AuthChoice };
+enum class Job {
+    kIdle,
+    kAuthAlpha,
+    kAuthBeta,
+    kAuthManual,
+    kAuthDs1991Alpha,
+    kAuthDs1991Beta,
+    kRead,
+    kMatch,
+    kWrite,
+    kRowReadFirst,
+    kRowReadSecond,
+    kRowWriteFirst,
+    kRowWriteSecond
+};
 }  // namespace
 
 int main() {
@@ -116,8 +130,11 @@ int main() {
                                         22U, SystemFont::kMedium);
     full_read_home_button.SetEnabled(false);
 
-    // Manual key entry is only shown if neither built-in algorithm authenticates.
-    label(password_view, 40, 30, strings.Get(StringId::kPasswordTitle), kInk, SystemFont::kLarge);
+    // The keypad is shared by password entry and the row editor.
+    auto password_back = button(password_view, {32, 30, 150, 54}, strings.Get(StringId::kButtonBackArrow), kPale,
+                                kBlue, 18U, SystemFont::kSmall);
+    auto password_title = password_view.CreateLabel({360, 30}, strings.Get(StringId::kPasswordTitle), kInk,
+                                                     SystemFont::kLarge, true).value();
     auto password_hint = label(password_view, 40, 92, strings.Get(StringId::kPasswordUsage), kSecondary);
     auto password_label = label(password_view, 40, 150, "FFFFFFFFFFFFFFFF", kInk, SystemFont::kLarge);
     auto cursor_label = label(password_view, 40, 200, strings.Get(StringId::kPasswordRamNote), kSecondary,
@@ -131,8 +148,8 @@ int main() {
     }
     auto key_back = button(password_view, {40, 555, 300, 64}, strings.Get(StringId::kButtonPreviousDigit));
     auto key_done = button(password_view, {380, 555, 300, 64}, strings.Get(StringId::kButtonDone), kBlue, kWhite);
-    auto key_cancel = button(password_view, {40, 635, 640, 44}, strings.Get(StringId::kButtonBackArrow), kPale,
-                             kBlue, 16U, SystemFont::kSmall);
+    auto row_save = button(password_view, {380, 555, 300, 64}, strings.Get(StringId::kButtonDone), kBlue, kWhite);
+    row_save.SetVisible(false);
 
     // Data view: identity, optional similarity match, and the selected 96-byte display page.
     auto data_back = button(data_view, {12, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U);
@@ -208,15 +225,18 @@ int main() {
     Rom rom{};
     Password manual_password{};
     Password active_password{};
+    std::array<uint8_t, kDataBytesPerRow> row_edit_data{};
+    std::array<std::array<uint8_t, 64>, 2> row_edit_pages{};
     static std::array<uint8_t, kFullDeviceBytes> device_data{};
     std::size_t dataset_index = 0, picker_page_index = 0;
     FixedString<112> match_summary;
     int last_written_dataset = -1;
     int matched_dataset = -1;
-    unsigned page_offset = 0, read_limit = kDefaultReadBytes, loaded_bytes = 0;
+    unsigned page_offset = 0, read_limit = kDefaultReadBytes, loaded_bytes = 0, row_edit_offset = 0;
     unsigned display_page = 0, write_page = 0, cursor = 0;
     unsigned match_index = 0, best_match_bytes = 0;
-    bool editing = false, device_present = false, authenticated = false;
+    bool editing = false, row_editing = false, row_crosses_page = false, device_present = false,
+         authenticated = false;
     auto device_capacity = [&] { return rom[0] == kDs1991FamilyCode ? kDs1991DataBytes : kFullDeviceBytes; };
     auto quick_read_bytes = [&] { return std::min(kDefaultReadBytes, device_capacity()); };
     auto show_home_hint = [&](StringId id) {
@@ -231,7 +251,7 @@ int main() {
         screen = next;
         home.SetVisible(next == Screen::kHome || next == Screen::kFullReadPrompt ||
                         next == Screen::kDs1991AuthChoice);
-        password_view.SetVisible(next == Screen::kPassword);
+        password_view.SetVisible(next == Screen::kPassword || next == Screen::kRowEdit);
         data_view.SetVisible(next == Screen::kData);
         picker_view.SetVisible(next == Screen::kPicker);
         confirm_view.SetVisible(next == Screen::kConfirm);
@@ -239,13 +259,32 @@ int main() {
         ds1991_auth_view.SetVisible(next == Screen::kDs1991AuthChoice);
     };
     auto update_key = [&] {
-        char text[17];
-        Hex(text, manual_password.data(), manual_password.size());
+        char text[25];
+        if (row_editing)
+            Hex(text, row_edit_data.data(), row_edit_data.size());
+        else
+            Hex(text, manual_password.data(), manual_password.size());
         password_label.SetText(text);
         FixedString<48> position;
         position.Append(strings.Get(StringId::kPasswordCursor));
         position.AppendUint(cursor + 1U);
         cursor_label.SetText(position.c_str());
+    };
+    auto begin_row_edit = [&](unsigned offset) {
+        if (rom[0] != kDs1977FamilyCode || offset + kDataBytesPerRow > 4096U || offset + kDataBytesPerRow > loaded_bytes)
+            return;
+        row_editing = true;
+        row_edit_offset = offset;
+        cursor = 0;
+        for (unsigned i = 0; i < row_edit_data.size(); ++i) row_edit_data[i] = device_data[offset + i];
+        password_title.SetText(strings.Get(StringId::kRowEditTitle));
+        password_hint.SetText(strings.Get(StringId::kRowEditHint));
+        password_label.SetPosition({40, 150});
+        password_label.SetText("000000000000000000000000");
+        row_save.SetVisible(true);
+        key_done.SetVisible(false);
+        update_key();
+        set_screen(Screen::kRowEdit);
     };
     auto update_device_labels = [&] {
         char id[17];
@@ -279,6 +318,22 @@ int main() {
         page.Append(" / ");
         page.AppendUint(page_count == 0U ? 1U : page_count);
         data_page.SetText(page.c_str());
+    };
+    auto finish_row_edit = [&](bool success) {
+        job = Job::kIdle;
+        if (success) {
+            for (unsigned i = 0; i < kDataBytesPerRow; ++i) device_data[row_edit_offset + i] = row_edit_data[i];
+            data_status.SetText(strings.Get(StringId::kRowEditSaved));
+            update_data_rows();
+        } else {
+            data_status.SetText(strings.Get(StringId::kRowEditFailed));
+        }
+        row_editing = false;
+        row_save.SetVisible(false);
+        key_done.SetVisible(true);
+        password_title.SetText(strings.Get(StringId::kPasswordTitle));
+        password_label.SetPosition({40, 150});
+        set_screen(Screen::kData);
     };
     auto update_dataset_list = [&] {
         constexpr std::size_t per_page = 5;
@@ -339,6 +394,11 @@ int main() {
     };
     auto show_manual_key = [&] {
         job = Job::kIdle;
+        row_editing = false;
+        password_title.SetText(strings.Get(StringId::kPasswordTitle));
+        password_label.SetPosition({40, 150});
+        row_save.SetVisible(false);
+        key_done.SetVisible(true);
         manual_password.fill(0xFF);
         cursor = 0;
         password_hint.SetText(strings.Get(StringId::kManualKeyHint));
@@ -493,7 +553,7 @@ int main() {
                         home_detail.SetPosition({64, 405});
                         home_detail.SetCentered(false);
                         home_detail.SetFont(SystemFont::kMedium);
-                        data_status.SetText(" ");
+                        data_status.SetText(rom[0] == kDs1977FamilyCode ? strings.Get(StringId::kRowEditTapHint) : " ");
                         match_button.SetEnabled(loaded_bytes != 0U);
                         full_read_home_button.SetVisible(rom[0] != kDs1991FamilyCode);
                         full_read_home_button.SetEnabled(rom[0] != kDs1991FamilyCode &&
@@ -526,7 +586,7 @@ int main() {
                     match_summary.Append("%");
                     match_name.SetText(match_summary.c_str());
                     picker_hint.SetText(match_summary.c_str());
-                    data_status.SetText(" ");
+                    data_status.SetText(rom[0] == kDs1977FamilyCode ? strings.Get(StringId::kRowEditTapHint) : " ");
                 } else {
                     FixedString<48> progress;
                     progress.Append(strings.Get(StringId::kStatusMatching));
@@ -559,26 +619,89 @@ int main() {
                     progress.AppendUint(kFullWritePages);
                     confirm_status.SetText(progress.c_str());
                 }
+            } else if (job == Job::kRowReadFirst || job == Job::kRowReadSecond) {
+                const bool second = job == Job::kRowReadSecond;
+                const unsigned page_index = second ? 1U : 0U;
+                const unsigned page_offset = (row_edit_offset / 64U + page_index) * 64U;
+                const auto result = app.ibutton().Read(rom, static_cast<uint16_t>(page_offset), 64U, active_password);
+                if (!result || result->status != IButtonStatus::kOk) {
+                    finish_row_edit(false);
+                } else {
+                    row_edit_pages[page_index] = result->data;
+                    if (!second && row_crosses_page) {
+                        job = Job::kRowReadSecond;
+                    } else {
+                        const unsigned first_page_offset = (row_edit_offset / 64U) * 64U;
+                        for (unsigned i = 0; i < row_edit_data.size(); ++i) {
+                            const unsigned relative = row_edit_offset + i - first_page_offset;
+                            const unsigned target_page = relative / 64U;
+                            row_edit_pages[target_page][relative % 64U] = row_edit_data[i];
+                        }
+                        job = Job::kRowWriteFirst;
+                        data_status.SetText(strings.Get(StringId::kRowEditWriting));
+                    }
+                }
+            } else if (job == Job::kRowWriteFirst || job == Job::kRowWriteSecond) {
+                const bool second = job == Job::kRowWriteSecond;
+                const unsigned page_index = second ? 1U : 0U;
+                const unsigned page_offset = (row_edit_offset / 64U + page_index) * 64U;
+                const auto result = app.ibutton().Write(rom, static_cast<uint16_t>(page_offset),
+                                                        row_edit_pages[page_index], active_password);
+                if (!result || result->status != IButtonStatus::kOk) {
+                    finish_row_edit(false);
+                } else if (!second && row_crosses_page) {
+                    job = Job::kRowWriteSecond;
+                } else {
+                    finish_row_edit(true);
+                }
             }
         }
         if (const auto* touch = event.touch()) {
             dirty = true;
-            if (screen == Screen::kPassword) {
+            if (screen == Screen::kPassword || screen == Screen::kRowEdit) {
                 for (unsigned i = 0; i < keys.size(); ++i)
-                    if (keys[i].OnTouch(*touch).clicked) {
-                        auto& byte = manual_password[cursor / 2U];
-                        byte = cursor % 2U == 0 ? static_cast<uint8_t>((byte & 0x0FU) | (i << 4U))
-                                                : static_cast<uint8_t>((byte & 0xF0U) | i);
-                        cursor = (cursor + 1U) % 16U;
+                    if (keys[i].OnTouch(*touch).clicked && job == Job::kIdle) {
+                        if (row_editing) {
+                            auto& byte = row_edit_data[cursor / 2U];
+                            byte = cursor % 2U == 0 ? static_cast<uint8_t>((byte & 0x0FU) | (i << 4U))
+                                                    : static_cast<uint8_t>((byte & 0xF0U) | i);
+                            cursor = (cursor + 1U) % 24U;
+                        } else {
+                            auto& byte = manual_password[cursor / 2U];
+                            byte = cursor % 2U == 0 ? static_cast<uint8_t>((byte & 0x0FU) | (i << 4U))
+                                                    : static_cast<uint8_t>((byte & 0xF0U) | i);
+                            cursor = (cursor + 1U) % 16U;
+                        }
                     }
-                if (key_back.OnTouch(*touch).clicked) cursor = (cursor + 15U) % 16U;
-                if (key_done.OnTouch(*touch).clicked && device_present) {
+                const unsigned digit_count = row_editing ? 24U : 16U;
+                if (key_back.OnTouch(*touch).clicked && job == Job::kIdle)
+                    cursor = (cursor + digit_count - 1U) % digit_count;
+                if (key_done.OnTouch(*touch).clicked && screen == Screen::kPassword && device_present) {
                     active_password = manual_password;
                     job = Job::kAuthManual;
                     password_hint.SetText(strings.Get(StringId::kStatusReading));
                     set_screen(Screen::kHome);
                 }
-                if (key_cancel.OnTouch(*touch).clicked) {
+                if (row_save.OnTouch(*touch).clicked && screen == Screen::kRowEdit && job == Job::kIdle &&
+                    device_present && authenticated) {
+                    const auto scan = app.ibutton().Scan();
+                    if (!scan || scan->status != IButtonStatus::kOk || scan->rom != rom) {
+                        finish_row_edit(false);
+                    } else {
+                        row_crosses_page = (row_edit_offset / 64U) != ((row_edit_offset + kDataBytesPerRow - 1U) / 64U);
+                        job = Job::kRowReadFirst;
+                        data_status.SetText(strings.Get(StringId::kRowEditReading));
+                    }
+                }
+                if (password_back.OnTouch(*touch).clicked && job == Job::kIdle) {
+                    if (row_editing) {
+                        row_editing = false;
+                        row_save.SetVisible(false);
+                        key_done.SetVisible(true);
+                        password_title.SetText(strings.Get(StringId::kPasswordTitle));
+                        password_label.SetPosition({40, 150});
+                        set_screen(Screen::kData);
+                    } else {
                     job = Job::kIdle;
                     if (device_present && rom[0] == kDs1991FamilyCode) {
                         (void)home_card.SetText(strings.Get(StringId::kConnectionConnected));
@@ -586,6 +709,7 @@ int main() {
                         show_home_hint(StringId::kPasswordHint);
                     }
                     set_screen(Screen::kHome);
+                    }
                 }
                 update_key();
             } else if (screen == Screen::kDs1991AuthChoice) {
@@ -610,6 +734,12 @@ int main() {
                 }
             } else if (screen == Screen::kData && job == Job::kIdle && loaded_bytes != 0U) {
                 if (data_back.OnTouch(*touch).clicked) set_screen(Screen::kHome);
+                if (touch->phase() == TouchPhase::kUp && rom[0] == kDs1977FamilyCode &&
+                    touch->x() >= 32 && touch->x() <= 688 && touch->y() >= 112 && touch->y() <= 444) {
+                    const unsigned row = static_cast<unsigned>(touch->y() - 112) / 42U;
+                    const unsigned offset = display_page * kDataBytesPerPage + row * kDataBytesPerRow;
+                    begin_row_edit(offset);
+                }
                 if (data_previous.OnTouch(*touch).clicked && display_page > 0U) {
                     --display_page;
                     update_data_rows();

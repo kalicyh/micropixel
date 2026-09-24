@@ -29,7 +29,7 @@ constexpr char kHex[] = "0123456789ABCDEF";
 constexpr unsigned kDefaultReadBytes = 0x0098U;
 constexpr unsigned kFourKilobytes = 4096U;
 constexpr unsigned kFullDeviceBytes = 32768U;
-constexpr unsigned kDataBytesPerRow = 12U;
+constexpr unsigned kDataBytesPerRow = 8U;
 constexpr unsigned kDataRowsPerPage = 8U;
 constexpr unsigned kDataBytesPerPage = kDataBytesPerRow * kDataRowsPerPage;
 constexpr uint8_t kDs1977FamilyCode = 0x37U;
@@ -151,7 +151,7 @@ int main() {
     auto row_save = button(password_view, {380, 555, 300, 64}, strings.Get(StringId::kButtonDone), kBlue, kWhite);
     row_save.SetVisible(false);
 
-    // Data view: identity, optional similarity match, and the selected 96-byte display page.
+    // Data view: identity, optional similarity match, and the selected 64-byte display page.
     auto data_back = button(data_view, {12, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U);
     auto data_title = data_view.CreateLabel({360, 30}, "—", kInk, SystemFont::kLarge, true).value();
     label(data_view, 40, 444, strings.Get(StringId::kMatchCaption), kSecondary, SystemFont::kSmall);
@@ -672,7 +672,7 @@ int main() {
                             auto& byte = row_edit_data[cursor / 2U];
                             byte = cursor % 2U == 0 ? static_cast<uint8_t>((byte & 0x0FU) | (i << 4U))
                                                     : static_cast<uint8_t>((byte & 0xF0U) | i);
-                            cursor = (cursor + 1U) % 24U;
+                            cursor = (cursor + 1U) % (row_edit_data.size() * 2U);
                         } else {
                             auto& byte = manual_password[cursor / 2U];
                             byte = cursor % 2U == 0 ? static_cast<uint8_t>((byte & 0x0FU) | (i << 4U))
@@ -680,7 +680,7 @@ int main() {
                             cursor = (cursor + 1U) % 16U;
                         }
                     }
-                const unsigned digit_count = row_editing ? 24U : 16U;
+                const unsigned digit_count = row_editing ? row_edit_data.size() * 2U : 16U;
                 if (key_back.OnTouch(*touch).clicked && job == Job::kIdle)
                     cursor = (cursor + digit_count - 1U) % digit_count;
                 if (key_done.OnTouch(*touch).clicked && screen == Screen::kPassword && device_present) {

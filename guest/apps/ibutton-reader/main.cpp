@@ -1,5 +1,5 @@
-#include <array>
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -79,16 +79,17 @@ enum class Job {
 
 int main() {
     Application app;
-    const auto strings = ibutton_reader_strings::ForLocale(app.localization().CurrentLocale());
+    [[clang::no_destroy]] static const auto strings =
+        ibutton_reader_strings::ForLocale(app.localization().CurrentLocale());
     app.renderer().ConfigureDisplay({.logical_size = {720, 720}, .scale_mode = DisplayScaleMode::kAspectFit}).value();
-    auto scene = app.renderer().CreateScene(kPale).value();
-    auto home = scene.CreateContainer().value();
-    auto password_view = scene.CreateContainer().value();
-    auto data_view = scene.CreateContainer().value();
-    auto picker_view = scene.CreateContainer().value();
-    auto confirm_view = scene.CreateContainer().value();
-    auto full_read_prompt_view = scene.CreateContainer().value();
-    auto ds1991_auth_view = scene.CreateContainer().value();
+    [[clang::no_destroy]] static auto scene = app.renderer().CreateScene(kPale).value();
+    [[clang::no_destroy]] static auto home = scene.CreateContainer().value();
+    [[clang::no_destroy]] static auto password_view = scene.CreateContainer().value();
+    [[clang::no_destroy]] static auto data_view = scene.CreateContainer().value();
+    [[clang::no_destroy]] static auto picker_view = scene.CreateContainer().value();
+    [[clang::no_destroy]] static auto confirm_view = scene.CreateContainer().value();
+    [[clang::no_destroy]] static auto full_read_prompt_view = scene.CreateContainer().value();
+    [[clang::no_destroy]] static auto ds1991_auth_view = scene.CreateContainer().value();
     password_view.SetVisible(false);
     data_view.SetVisible(false);
     picker_view.SetVisible(false);
@@ -117,130 +118,150 @@ int main() {
 
     // Home is a status card. Its surface changes color while the device is being read.
     label(home, 40, 28, strings.Get(StringId::kAppTitle), kInk, SystemFont::kLarge);
-    auto home_card = button(home, {24, 112, 672, 454}, strings.Get(StringId::kConnectionChecking), kGray, kInk, 34U,
-                            SystemFont::kLarge);
+    [[clang::no_destroy]] static auto home_card = button(
+        home, {24, 112, 672, 454}, strings.Get(StringId::kConnectionChecking), kGray, kInk, 34U, SystemFont::kLarge);
     home_card.SetEnabled(false);
-    auto device_name = label(home, 48, 514, strings.Get(StringId::kIdNotScanned), kSecondary,
-                             SystemFont::kMedium);
-    auto home_detail = label(home, 64, 405, strings.Get(StringId::kPasswordHint), kSecondary, SystemFont::kMedium);
+    [[clang::no_destroy]] static auto device_name =
+        label(home, 48, 514, strings.Get(StringId::kIdNotScanned), kSecondary, SystemFont::kMedium);
+    [[clang::no_destroy]] static auto home_detail =
+        label(home, 64, 405, strings.Get(StringId::kPasswordHint), kSecondary, SystemFont::kMedium);
     home_detail.SetPosition({530, 514});
     home_detail.SetCentered(true);
     home_detail.SetFont(SystemFont::kSmall);
-    auto full_read_home_button = button(home, {40, 610, 640, 72}, strings.Get(StringId::kButtonFullRead), kWhite, kBlue,
-                                        22U, SystemFont::kMedium);
+    [[clang::no_destroy]] static auto full_read_home_button = button(
+        home, {40, 610, 640, 72}, strings.Get(StringId::kButtonFullRead), kWhite, kBlue, 22U, SystemFont::kMedium);
     full_read_home_button.SetEnabled(false);
 
     // The keypad is shared by password entry and the row editor.
-    auto password_back = button(password_view, {32, 30, 150, 54}, strings.Get(StringId::kButtonBackArrow), kPale,
-                                kBlue, 18U, SystemFont::kSmall);
-    auto password_title = password_view.CreateLabel({360, 30}, strings.Get(StringId::kPasswordTitle), kInk,
-                                                     SystemFont::kLarge, true).value();
-    auto password_hint = label(password_view, 40, 92, strings.Get(StringId::kPasswordUsage), kSecondary);
-    auto password_label = label(password_view, 40, 150, "FFFFFFFFFFFFFFFF", kInk, SystemFont::kLarge);
-    auto cursor_label = label(password_view, 40, 200, strings.Get(StringId::kPasswordRamNote), kSecondary,
-                              SystemFont::kSmall);
-    std::array<ui::TextButton, 16> keys;
+    [[clang::no_destroy]] static auto password_back =
+        button(password_view, {32, 30, 150, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U,
+               SystemFont::kSmall);
+    [[clang::no_destroy]] static auto password_title =
+        password_view.CreateLabel({360, 30}, strings.Get(StringId::kPasswordTitle), kInk, SystemFont::kLarge, true)
+            .value();
+    [[clang::no_destroy]] static auto password_hint =
+        label(password_view, 40, 92, strings.Get(StringId::kPasswordUsage), kSecondary);
+    [[clang::no_destroy]] static auto password_label =
+        label(password_view, 40, 150, "FFFFFFFFFFFFFFFF", kInk, SystemFont::kLarge);
+    [[clang::no_destroy]] static auto cursor_label =
+        label(password_view, 40, 200, strings.Get(StringId::kPasswordRamNote), kSecondary, SystemFont::kSmall);
+    static std::array<ui::TextButton, 16> keys;
     for (unsigned i = 0; i < keys.size(); ++i) {
         char digit[]{kHex[i], '\0'};
-        keys[i] = button(password_view, {40 + static_cast<int>(i % 4) * 160,
-                                         270 + static_cast<int>(i / 4) * 66, 140, 54},
-                         digit, kWhite, kInk, 16U, SystemFont::kLarge);
+        keys[i] =
+            button(password_view, {40 + static_cast<int>(i % 4) * 160, 270 + static_cast<int>(i / 4) * 66, 140, 54},
+                   digit, kWhite, kInk, 16U, SystemFont::kLarge);
     }
-    auto key_back = button(password_view, {40, 555, 300, 64}, strings.Get(StringId::kButtonPreviousDigit));
-    auto key_done = button(password_view, {380, 555, 300, 64}, strings.Get(StringId::kButtonDone), kBlue, kWhite);
-    auto row_save = button(password_view, {380, 555, 300, 64}, strings.Get(StringId::kButtonDone), kBlue, kWhite);
+    [[clang::no_destroy]] static auto key_back =
+        button(password_view, {40, 555, 300, 64}, strings.Get(StringId::kButtonPreviousDigit));
+    [[clang::no_destroy]] static auto key_done =
+        button(password_view, {380, 555, 300, 64}, strings.Get(StringId::kButtonDone), kBlue, kWhite);
+    [[clang::no_destroy]] static auto row_save =
+        button(password_view, {380, 555, 300, 64}, strings.Get(StringId::kButtonDone), kBlue, kWhite);
     row_save.SetVisible(false);
 
     // Data view: identity, optional similarity match, and the selected 64-byte display page.
-    auto data_back = button(data_view, {12, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U);
-    auto data_title = data_view.CreateLabel({360, 30}, "—", kInk, SystemFont::kLarge, true).value();
-    label(data_view, 40, 444, strings.Get(StringId::kMatchCaption), kSecondary, SystemFont::kSmall);
-    auto match_name = label(data_view, 40, 468, "—", kInk, SystemFont::kLarge);
-    std::array<ui::TextButton, kDataRowsPerPage> data_row_buttons;
+    [[clang::no_destroy]] static auto data_back =
+        button(data_view, {12, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U);
+    [[clang::no_destroy]] static auto data_title =
+        data_view.CreateLabel({360, 30}, "—", kInk, SystemFont::kLarge, true).value();
+    label(data_view, 40, 454, strings.Get(StringId::kMatchCaption), kSecondary, SystemFont::kSmall);
+    [[clang::no_destroy]] static auto match_name = label(data_view, 40, 478, "—", kInk, SystemFont::kLarge);
+    static std::array<ui::TextButton, kDataRowsPerPage> data_row_buttons;
     for (unsigned i = 0; i < data_row_buttons.size(); ++i)
-        data_row_buttons[i] = button(data_view, {32, 116 + static_cast<int>(i) * 42, 656, 38}, " ", kWhite, kWhite,
-                                     8U, SystemFont::kSmall);
-    std::array<LabelNode, kDataRowsPerPage> data_rows;
+        data_row_buttons[i] = button(data_view, {32, 116 + static_cast<int>(i) * 42, 656, 38}, "00", kWhite, kWhite, 8U,
+                                     SystemFont::kSmall);
+    static std::array<LabelNode, kDataRowsPerPage> data_rows;
     for (unsigned i = 0; i < data_rows.size(); ++i)
         data_rows[i] = label(data_view, 40, 120 + static_cast<int>(i) * 42, " ", kInk, SystemFont::kLarge);
-    auto data_page = data_view.CreateLabel({625, 456}, "1 / 64", kSecondary, SystemFont::kSmall, true).value();
-    auto data_previous = button(data_view, {390, 488, 130, 46}, strings.Get(StringId::kButtonPrevious), kPale, kBlue,
-                                16U, SystemFont::kSmall);
-    auto data_next = button(data_view, {540, 488, 140, 46}, strings.Get(StringId::kButtonNext), kPale, kBlue, 16U,
-                            SystemFont::kSmall);
-    auto data_status = label(data_view, 40, 540, strings.Get(StringId::kStatusReading), kSecondary,
-                             SystemFont::kSmall);
-    auto match_button = button(data_view, {40, 610, 300, 72}, strings.Get(StringId::kButtonMatchImage), kWhite, kBlue,
-                               22U, SystemFont::kMedium);
-    auto data_choose = button(data_view, {360, 610, 320, 72}, strings.Get(StringId::kButtonChooseData), kBlue, kWhite,
-                              22U, SystemFont::kMedium);
+    [[clang::no_destroy]] static auto data_page =
+        data_view.CreateLabel({625, 456}, "1 / 64", kSecondary, SystemFont::kSmall, true).value();
+    [[clang::no_destroy]] static auto data_previous = button(
+        data_view, {390, 488, 130, 46}, strings.Get(StringId::kButtonPrevious), kPale, kBlue, 16U, SystemFont::kSmall);
+    [[clang::no_destroy]] static auto data_next = button(
+        data_view, {540, 488, 140, 46}, strings.Get(StringId::kButtonNext), kPale, kBlue, 16U, SystemFont::kSmall);
+    [[clang::no_destroy]] static auto data_status =
+        label(data_view, 40, 540, strings.Get(StringId::kStatusReading), kSecondary, SystemFont::kSmall);
+    [[clang::no_destroy]] static auto match_button =
+        button(data_view, {40, 610, 300, 72}, strings.Get(StringId::kButtonMatchImage), kWhite, kBlue, 22U,
+               SystemFont::kMedium);
+    [[clang::no_destroy]] static auto data_choose =
+        button(data_view, {360, 610, 320, 72}, strings.Get(StringId::kButtonChooseData), kBlue, kWhite, 22U,
+               SystemFont::kMedium);
 
     // The catalog remains a separate page with large tap targets.
-    auto picker_back = button(picker_view, {12, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue,
-                              18U);
+    [[clang::no_destroy]] static auto picker_back =
+        button(picker_view, {12, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U);
     (void)picker_view.CreateLabel({360, 30}, strings.Get(StringId::kPickerTitle), kInk, SystemFont::kLarge, true);
-    auto picker_hint = label(picker_view, 40, 96, strings.Get(StringId::kMatchTapHint), kSecondary,
-                             SystemFont::kSmall);
-    std::array<ui::TextButton, 5> dataset_buttons;
+    [[clang::no_destroy]] static auto picker_hint =
+        label(picker_view, 40, 96, strings.Get(StringId::kMatchTapHint), kSecondary, SystemFont::kSmall);
+    static std::array<ui::TextButton, 5> dataset_buttons;
     for (unsigned i = 0; i < dataset_buttons.size(); ++i)
-        dataset_buttons[i] = button(picker_view, {40, 138 + static_cast<int>(i) * 72, 640, 60}, "-", kWhite, kInk,
-                                    18U, SystemFont::kMedium);
-    auto picker_page = label(picker_view, 40, 602, "1 / 1", kSecondary, SystemFont::kSmall);
-    auto page_previous = button(picker_view, {390, 638, 130, 54}, strings.Get(StringId::kButtonPrevious), kWhite,
-                                kBlue, 18U, SystemFont::kSmall);
-    auto page_next = button(picker_view, {540, 638, 140, 54}, strings.Get(StringId::kButtonNext), kWhite, kBlue, 18U,
-                            SystemFont::kSmall);
+        dataset_buttons[i] = button(picker_view, {40, 138 + static_cast<int>(i) * 72, 640, 60}, "-", kWhite, kInk, 18U,
+                                    SystemFont::kMedium);
+    [[clang::no_destroy]] static auto picker_page =
+        label(picker_view, 40, 602, "1 / 1", kSecondary, SystemFont::kSmall);
+    [[clang::no_destroy]] static auto page_previous =
+        button(picker_view, {390, 638, 130, 54}, strings.Get(StringId::kButtonPrevious), kWhite, kBlue, 18U,
+               SystemFont::kSmall);
+    [[clang::no_destroy]] static auto page_next = button(
+        picker_view, {540, 638, 140, 54}, strings.Get(StringId::kButtonNext), kWhite, kBlue, 18U, SystemFont::kSmall);
 
-    auto confirm_back = button(confirm_view, {32, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale,
-                               kBlue, 18U);
+    [[clang::no_destroy]] static auto confirm_back =
+        button(confirm_view, {32, 24, 160, 54}, strings.Get(StringId::kButtonBackArrow), kPale, kBlue, 18U);
     label(confirm_view, 40, 132, strings.Get(StringId::kConfirmTitle), kInk, SystemFont::kLarge);
-    auto confirm_name = label(confirm_view, 40, 226, strings.Get(StringId::kFactoryNoData), kBlue, SystemFont::kLarge);
+    [[clang::no_destroy]] static auto confirm_name =
+        label(confirm_view, 40, 226, strings.Get(StringId::kFactoryNoData), kBlue, SystemFont::kLarge);
     label(confirm_view, 40, 310, strings.Get(StringId::kConfirmNote), kSecondary);
-    auto confirm_status = label(confirm_view, 40, 390, " ", kSecondary);
-    auto confirm_full_write = button(confirm_view, {40, 570, 640, 76}, strings.Get(StringId::kFactoryFullWrite),
-                                     kBlue, kWhite, 24U, SystemFont::kLarge);
+    [[clang::no_destroy]] static auto confirm_status = label(confirm_view, 40, 390, " ", kSecondary);
+    [[clang::no_destroy]] static auto confirm_full_write =
+        button(confirm_view, {40, 570, 640, 76}, strings.Get(StringId::kFactoryFullWrite), kBlue, kWhite, 24U,
+               SystemFont::kLarge);
 
     (void)full_read_prompt_view.CreateShape({0, 0, 720, 720}, kInk, 128U);
     (void)full_read_prompt_view.CreateRoundedRect({52, 218, 616, 284}, {.fill = kWhite, .radius = 30U});
     label(full_read_prompt_view, 88, 252, strings.Get(StringId::kFullReadConfirmTitle), kInk, SystemFont::kLarge);
     label(full_read_prompt_view, 88, 310, strings.Get(StringId::kFullReadConfirmNote), kSecondary);
-    auto full_read_4kb = button(full_read_prompt_view, {72, 408, 176, 62}, strings.Get(StringId::kButtonRead4kb),
-                                kWhite, kBlue, 18U);
-    auto full_read_all = button(full_read_prompt_view, {272, 408, 176, 62}, strings.Get(StringId::kButtonReadAll),
-                                kBlue, kWhite, 18U);
-    auto full_read_cancel = button(full_read_prompt_view, {472, 408, 176, 62}, strings.Get(StringId::kButtonCancel),
-                                   kPale, kBlue, 18U);
+    [[clang::no_destroy]] static auto full_read_4kb =
+        button(full_read_prompt_view, {72, 408, 176, 62}, strings.Get(StringId::kButtonRead4kb), kWhite, kBlue, 18U);
+    [[clang::no_destroy]] static auto full_read_all =
+        button(full_read_prompt_view, {272, 408, 176, 62}, strings.Get(StringId::kButtonReadAll), kBlue, kWhite, 18U);
+    [[clang::no_destroy]] static auto full_read_cancel =
+        button(full_read_prompt_view, {472, 408, 176, 62}, strings.Get(StringId::kButtonCancel), kPale, kBlue, 18U);
 
     (void)ds1991_auth_view.CreateShape({0, 0, 720, 720}, kInk, 128U);
     (void)ds1991_auth_view.CreateRoundedRect({54, 165, 612, 420}, {.fill = kWhite, .radius = 30U});
     label(ds1991_auth_view, 90, 202, strings.Get(StringId::kAuthChoiceTitle), kInk, SystemFont::kLarge);
     label(ds1991_auth_view, 90, 264, strings.Get(StringId::kWarningDs1991), kSecondary, SystemFont::kSmall);
-    auto auth_alpha = button(ds1991_auth_view, {76, 354, 176, 76}, strings.Get(StringId::kButtonAlgorithmAlpha),
-                             kWhite, kBlue, 20U, SystemFont::kMedium);
-    auto auth_beta = button(ds1991_auth_view, {272, 354, 176, 76}, strings.Get(StringId::kButtonAlgorithmBeta),
-                            kWhite, kBlue, 20U, SystemFont::kMedium);
-    auto auth_manual = button(ds1991_auth_view, {468, 354, 176, 76}, strings.Get(StringId::kButtonPasswordManual),
-                              kBlue, kWhite, 20U, SystemFont::kMedium);
-    auto auth_cancel = button(ds1991_auth_view, {250, 480, 220, 60}, strings.Get(StringId::kButtonCancel),
-                              kPale, kBlue, 18U);
+    [[clang::no_destroy]] static auto auth_alpha =
+        button(ds1991_auth_view, {76, 354, 176, 76}, strings.Get(StringId::kButtonAlgorithmAlpha), kWhite, kBlue, 20U,
+               SystemFont::kMedium);
+    [[clang::no_destroy]] static auto auth_beta =
+        button(ds1991_auth_view, {272, 354, 176, 76}, strings.Get(StringId::kButtonAlgorithmBeta), kWhite, kBlue, 20U,
+               SystemFont::kMedium);
+    [[clang::no_destroy]] static auto auth_manual =
+        button(ds1991_auth_view, {468, 354, 176, 76}, strings.Get(StringId::kButtonPasswordManual), kBlue, kWhite, 20U,
+               SystemFont::kMedium);
+    [[clang::no_destroy]] static auto auth_cancel =
+        button(ds1991_auth_view, {250, 480, 220, 60}, strings.Get(StringId::kButtonCancel), kPale, kBlue, 18U);
 
-    Screen screen = Screen::kHome;
-    Job job = Job::kIdle;
-    Rom rom{};
-    Password manual_password{};
-    Password active_password{};
-    std::array<uint8_t, kDataBytesPerRow> row_edit_data{};
-    std::array<std::array<uint8_t, 64>, 2> row_edit_pages{};
+    static Screen screen = Screen::kHome;
+    static Job job = Job::kIdle;
+    static Rom rom{};
+    static Password manual_password{};
+    static Password active_password{};
+    static std::array<uint8_t, kDataBytesPerRow> row_edit_data{};
+    static std::array<std::array<uint8_t, 64>, 2> row_edit_pages{};
     static std::array<uint8_t, kFullDeviceBytes> device_data{};
     std::size_t dataset_index = 0, picker_page_index = 0;
     FixedString<112> match_summary;
     int last_written_dataset = -1;
     int matched_dataset = -1;
-    unsigned page_offset = 0, read_limit = kDefaultReadBytes, loaded_bytes = 0, row_edit_offset = 0;
-    unsigned display_page = 0, write_page = 0, cursor = 0;
-    unsigned match_index = 0, best_match_bytes = 0;
-    bool editing = false, row_editing = false, row_crosses_page = false, device_present = false,
-         authenticated = false;
+    static unsigned page_offset = 0, read_limit = kDefaultReadBytes, loaded_bytes = 0, row_edit_offset = 0;
+    static unsigned display_page = 0, write_page = 0, cursor = 0;
+    static unsigned match_index = 0, best_match_bytes = 0;
+    static bool editing = false, row_editing = false, row_crosses_page = false, device_present = false,
+                authenticated = false;
     auto device_capacity = [&] { return rom[0] == kDs1991FamilyCode ? kDs1991DataBytes : kFullDeviceBytes; };
     auto quick_read_bytes = [&] { return std::min(kDefaultReadBytes, device_capacity()); };
     auto show_home_hint = [&](StringId id) {
@@ -253,8 +274,7 @@ int main() {
     auto set_screen = [&](Screen next) {
         if (screen == Screen::kPicker && next != Screen::kPicker) last_written_dataset = -1;
         screen = next;
-        home.SetVisible(next == Screen::kHome || next == Screen::kFullReadPrompt ||
-                        next == Screen::kDs1991AuthChoice);
+        home.SetVisible(next == Screen::kHome || next == Screen::kFullReadPrompt || next == Screen::kDs1991AuthChoice);
         password_view.SetVisible(next == Screen::kPassword || next == Screen::kRowEdit);
         data_view.SetVisible(next == Screen::kData);
         picker_view.SetVisible(next == Screen::kPicker);
@@ -275,7 +295,8 @@ int main() {
         cursor_label.SetText(position.c_str());
     };
     auto begin_row_edit = [&](unsigned offset) {
-        if (rom[0] != kDs1977FamilyCode || offset + kDataBytesPerRow > 4096U || offset + kDataBytesPerRow > loaded_bytes)
+        if (rom[0] != kDs1977FamilyCode || offset + kDataBytesPerRow > 4096U ||
+            offset + kDataBytesPerRow > loaded_bytes)
             return;
         row_editing = true;
         row_edit_offset = offset;
@@ -302,8 +323,7 @@ int main() {
     auto update_data_rows = [&] {
         for (unsigned row = 0; row < data_rows.size(); ++row) {
             const auto offset = static_cast<uint16_t>(display_page * kDataBytesPerPage + row * kDataBytesPerRow);
-            data_row_buttons[row].SetEnabled(rom[0] == kDs1977FamilyCode &&
-                                             offset + kDataBytesPerRow <= 4096U &&
+            data_row_buttons[row].SetEnabled(rom[0] == kDs1977FamilyCode && offset + kDataBytesPerRow <= 4096U &&
                                              offset + kDataBytesPerRow <= loaded_bytes);
             if (offset >= loaded_bytes) {
                 data_rows[row].SetText(" ");
@@ -360,8 +380,11 @@ int main() {
             if (recently_written) title.Append("✓   ");
             title.Append(ibutton_reader::kFactoryCatalog[index].name);
             (void)dataset_buttons[row].SetText(title.c_str());
-            (void)dataset_buttons[row].SetStyle({.background = color, .text = text_color, .feedback = kGray,
-                                                  .font = SystemFont::kMedium, .corner_radius = 18U});
+            (void)dataset_buttons[row].SetStyle({.background = color,
+                                                 .text = text_color,
+                                                 .feedback = kGray,
+                                                 .font = SystemFont::kMedium,
+                                                 .corner_radius = 18U});
         }
         FixedString<32> page;
         page.AppendUint(picker_page_index + 1U);
@@ -386,11 +409,14 @@ int main() {
         }
         matched_dataset = -1;
         match_name.SetText("—");
-        (void)home_card.SetStyle({.background = kReadingCard, .text = kBlue, .feedback = kGray,
-                                  .font = SystemFont::kLarge, .corner_radius = 34U});
+        (void)home_card.SetStyle({.background = kReadingCard,
+                                  .text = kBlue,
+                                  .feedback = kGray,
+                                  .font = SystemFont::kLarge,
+                                  .corner_radius = 34U});
         const auto reading_label = target_bytes == quick_read_bytes() ? StringId::kStatusQuickReading
-                                   : target_bytes == kFourKilobytes ? StringId::kStatusReading4kb
-                                                                    : StringId::kStatusReadingFull;
+                                   : target_bytes == kFourKilobytes   ? StringId::kStatusReading4kb
+                                                                      : StringId::kStatusReadingFull;
         (void)home_card.SetText(" ");
         home_detail.SetPosition({530, 514});
         home_detail.SetCentered(true);
@@ -421,8 +447,8 @@ int main() {
         if (!result) app.log().Error("iButton Reader: rendering failed");
     };
 
-    auto work_timer = app.timers().Every(30_ms).value();
-    auto scan_timer = app.timers().Every(1_s).value();
+    [[clang::no_destroy]] static auto work_timer = app.timers().Every(30_ms).value();
+    [[clang::no_destroy]] static auto scan_timer = app.timers().Every(1_s).value();
     present();
     app.Run([&](const Event& event) {
         bool dirty = false;
@@ -434,8 +460,11 @@ int main() {
                     device_present = false;
                     authenticated = false;
                     loaded_bytes = 0;
-                    (void)home_card.SetStyle({.background = kGray, .text = kSecondary, .feedback = kPale,
-                                              .font = SystemFont::kLarge, .corner_radius = 34U});
+                    (void)home_card.SetStyle({.background = kGray,
+                                              .text = kSecondary,
+                                              .feedback = kPale,
+                                              .font = SystemFont::kLarge,
+                                              .corner_radius = 34U});
                     (void)home_card.SetText(strings.Get(StringId::kConnectionDisconnected));
                     home_card.SetEnabled(false);
                     full_read_home_button.SetEnabled(false);
@@ -452,8 +481,11 @@ int main() {
                 loaded_bytes = 0;
                 update_device_labels();
                 full_read_home_button.SetVisible(rom[0] != kDs1991FamilyCode);
-                (void)home_card.SetStyle({.background = kReadingCard, .text = kBlue, .feedback = kGray,
-                                          .font = SystemFont::kLarge, .corner_radius = 34U});
+                (void)home_card.SetStyle({.background = kReadingCard,
+                                          .text = kBlue,
+                                          .feedback = kGray,
+                                          .font = SystemFont::kLarge,
+                                          .corner_radius = 34U});
                 (void)home_card.SetText(strings.Get(StringId::kStatusReading));
                 home_card.SetEnabled(false);
                 if (rom[0] == kDs1977FamilyCode) {
@@ -471,8 +503,11 @@ int main() {
                     show_ds1991_auth_choice();
                 } else {
                     (void)data_choose.SetText(strings.Get(StringId::kButtonChooseData));
-                    (void)home_card.SetStyle({.background = kGray, .text = kSecondary, .feedback = kPale,
-                                              .font = SystemFont::kLarge, .corner_radius = 34U});
+                    (void)home_card.SetStyle({.background = kGray,
+                                              .text = kSecondary,
+                                              .feedback = kPale,
+                                              .font = SystemFont::kLarge,
+                                              .corner_radius = 34U});
                     (void)home_card.SetText(strings.Get(StringId::kConnectionConnected));
                     home_card.SetEnabled(false);
                     show_home_hint(StringId::kStatusUnsupported);
@@ -514,15 +549,18 @@ int main() {
                 }
             } else if (job == Job::kRead) {
                 const unsigned device_page_bytes = rom[0] == kDs1991FamilyCode ? kDs1991PageBytes : 64U;
-                const unsigned chunk = std::min({64U - page_offset % 64U,
-                                                 device_page_bytes - page_offset % device_page_bytes,
-                                                 read_limit - page_offset});
+                const unsigned chunk =
+                    std::min({64U - page_offset % 64U, device_page_bytes - page_offset % device_page_bytes,
+                              read_limit - page_offset});
                 const auto result = app.ibutton().Read(rom, static_cast<uint16_t>(page_offset),
-                                                      static_cast<uint16_t>(chunk), active_password);
+                                                       static_cast<uint16_t>(chunk), active_password);
                 if (!result || result->status != IButtonStatus::kOk) {
                     job = Job::kIdle;
-                    (void)home_card.SetStyle({.background = kErrorCard, .text = kInk, .feedback = kGray,
-                                              .font = SystemFont::kLarge, .corner_radius = 34U});
+                    (void)home_card.SetStyle({.background = kErrorCard,
+                                              .text = kInk,
+                                              .feedback = kGray,
+                                              .font = SystemFont::kLarge,
+                                              .corner_radius = 34U});
                     (void)home_card.SetText(strings.Get(StringId::kStatusReadFailed));
                     home_card.SetEnabled(authenticated);
                     home_detail.SetText(strings.Get(StringId::kStatusReadFailed));
@@ -540,8 +578,8 @@ int main() {
                     loaded_bytes = page_offset;
                     FixedString<48> progress;
                     const auto progress_label = read_limit == quick_read_bytes() ? StringId::kStatusQuickReading
-                                                : read_limit == kFourKilobytes ? StringId::kStatusReading4kb
-                                                                              : StringId::kStatusReadingFull;
+                                                : read_limit == kFourKilobytes   ? StringId::kStatusReading4kb
+                                                                                 : StringId::kStatusReadingFull;
                     progress.Append(strings.Get(progress_label));
                     progress.Append(" ");
                     progress.AppendUint((page_offset + 63U) / 64U);
@@ -552,8 +590,11 @@ int main() {
                         job = Job::kIdle;
                         display_page = 0;
                         update_data_rows();
-                        (void)home_card.SetStyle({.background = kWhite, .text = kGreen, .feedback = kGray,
-                                                  .font = SystemFont::kTitle, .corner_radius = 34U});
+                        (void)home_card.SetStyle({.background = kWhite,
+                                                  .text = kGreen,
+                                                  .feedback = kGray,
+                                                  .font = SystemFont::kTitle,
+                                                  .corner_radius = 34U});
                         (void)home_card.SetText(strings.Get(StringId::kStatusQuickReadPrompt));
                         home_card.SetEnabled(authenticated);
                         home_detail.SetText(" ");
@@ -605,9 +646,10 @@ int main() {
                 }
             } else if (job == Job::kWrite) {
                 const auto& dataset = ibutton_reader::kFactoryCatalog[dataset_index];
-                std::array<uint8_t, 64> page{};
+                static std::array<uint8_t, 64> page{};
                 for (unsigned i = 0; i < page.size(); ++i) page[i] = dataset.bytes[write_page * 64U + i];
-                const auto result = app.ibutton().Write(rom, static_cast<uint16_t>(write_page * 64U), page, active_password);
+                const auto result =
+                    app.ibutton().Write(rom, static_cast<uint16_t>(write_page * 64U), page, active_password);
                 if (!result || result->status != IButtonStatus::kOk) {
                     job = Job::kIdle;
                     confirm_status.SetText(strings.Get(StringId::kFactoryFailed));
@@ -709,13 +751,13 @@ int main() {
                         password_label.SetPosition({40, 150});
                         set_screen(Screen::kData);
                     } else {
-                    job = Job::kIdle;
-                    if (device_present && rom[0] == kDs1991FamilyCode) {
-                        (void)home_card.SetText(strings.Get(StringId::kConnectionConnected));
-                        home_card.SetEnabled(true);
-                        show_home_hint(StringId::kPasswordHint);
-                    }
-                    set_screen(Screen::kHome);
+                        job = Job::kIdle;
+                        if (device_present && rom[0] == kDs1991FamilyCode) {
+                            (void)home_card.SetText(strings.Get(StringId::kConnectionConnected));
+                            home_card.SetEnabled(true);
+                            show_home_hint(StringId::kPasswordHint);
+                        }
+                        set_screen(Screen::kHome);
                     }
                 }
                 update_key();
@@ -770,20 +812,26 @@ int main() {
                 }
             } else if (screen == Screen::kHome) {
                 if (home_card.OnTouch(*touch).clicked && job == Job::kIdle && device_present) {
-                    if (rom[0] == kDs1991FamilyCode) show_ds1991_auth_choice();
-                    else if (authenticated) (void)start_read(quick_read_bytes());
+                    if (rom[0] == kDs1991FamilyCode)
+                        show_ds1991_auth_choice();
+                    else if (authenticated)
+                        (void)start_read(quick_read_bytes());
                 }
                 if (full_read_home_button.OnTouch(*touch).clicked && job == Job::kIdle && authenticated &&
                     rom[0] != kDs1991FamilyCode && loaded_bytes < device_capacity())
                     set_screen(Screen::kFullReadPrompt);
             } else if (screen == Screen::kFullReadPrompt) {
                 if (full_read_4kb.OnTouch(*touch).clicked) {
-                    if (start_read(kFourKilobytes, false, true)) set_screen(Screen::kHome);
-                    else set_screen(Screen::kData);
+                    if (start_read(kFourKilobytes, false, true))
+                        set_screen(Screen::kHome);
+                    else
+                        set_screen(Screen::kData);
                 }
                 if (full_read_all.OnTouch(*touch).clicked) {
-                    if (start_read(kFullDeviceBytes, false, true)) set_screen(Screen::kHome);
-                    else set_screen(Screen::kData);
+                    if (start_read(kFullDeviceBytes, false, true))
+                        set_screen(Screen::kHome);
+                    else
+                        set_screen(Screen::kData);
                 }
                 if (full_read_cancel.OnTouch(*touch).clicked) set_screen(Screen::kHome);
             } else if (screen == Screen::kPicker && job == Job::kIdle) {
@@ -797,8 +845,8 @@ int main() {
                         set_screen(Screen::kConfirm);
                     }
                 }
-                const auto page_count = (ibutton_reader::kFactoryCatalog.size() + dataset_buttons.size() - 1U) /
-                                        dataset_buttons.size();
+                const auto page_count =
+                    (ibutton_reader::kFactoryCatalog.size() + dataset_buttons.size() - 1U) / dataset_buttons.size();
                 if (page_previous.OnTouch(*touch).clicked && picker_page_index > 0U) {
                     --picker_page_index;
                     last_written_dataset = -1;
@@ -814,7 +862,8 @@ int main() {
                     set_screen(Screen::kPicker);
                     update_dataset_list();
                 }
-                if (confirm_full_write.OnTouch(*touch).clicked && job == Job::kIdle && device_present && authenticated) {
+                if (confirm_full_write.OnTouch(*touch).clicked && job == Job::kIdle && device_present &&
+                    authenticated) {
                     const auto scan = app.ibutton().Scan();
                     if (scan && scan->status == IButtonStatus::kOk && scan->rom == rom) {
                         write_page = 0;

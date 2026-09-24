@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "app_id": "micropixel.ibutton-reader",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "threading": "none",
   "title": {
     "default": "en",

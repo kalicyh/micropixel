@@ -156,6 +156,10 @@ int main() {
     auto data_title = data_view.CreateLabel({360, 30}, "—", kInk, SystemFont::kLarge, true).value();
     label(data_view, 40, 444, strings.Get(StringId::kMatchCaption), kSecondary, SystemFont::kSmall);
     auto match_name = label(data_view, 40, 468, "—", kInk, SystemFont::kLarge);
+    std::array<ui::TextButton, kDataRowsPerPage> data_row_buttons;
+    for (unsigned i = 0; i < data_row_buttons.size(); ++i)
+        data_row_buttons[i] = button(data_view, {32, 116 + static_cast<int>(i) * 42, 656, 38}, " ", kWhite, kWhite,
+                                     8U, SystemFont::kSmall);
     std::array<LabelNode, kDataRowsPerPage> data_rows;
     for (unsigned i = 0; i < data_rows.size(); ++i)
         data_rows[i] = label(data_view, 40, 120 + static_cast<int>(i) * 42, " ", kInk, SystemFont::kLarge);
@@ -298,6 +302,9 @@ int main() {
     auto update_data_rows = [&] {
         for (unsigned row = 0; row < data_rows.size(); ++row) {
             const auto offset = static_cast<uint16_t>(display_page * kDataBytesPerPage + row * kDataBytesPerRow);
+            data_row_buttons[row].SetEnabled(rom[0] == kDs1977FamilyCode &&
+                                             offset + kDataBytesPerRow <= 4096U &&
+                                             offset + kDataBytesPerRow <= loaded_bytes);
             if (offset >= loaded_bytes) {
                 data_rows[row].SetText(" ");
                 continue;
@@ -734,12 +741,9 @@ int main() {
                 }
             } else if (screen == Screen::kData && job == Job::kIdle && loaded_bytes != 0U) {
                 if (data_back.OnTouch(*touch).clicked) set_screen(Screen::kHome);
-                if (touch->phase() == TouchPhase::kUp && rom[0] == kDs1977FamilyCode &&
-                    touch->x() >= 32 && touch->x() <= 688 && touch->y() >= 112 && touch->y() <= 444) {
-                    const unsigned row = static_cast<unsigned>(touch->y() - 112) / 42U;
-                    const unsigned offset = display_page * kDataBytesPerPage + row * kDataBytesPerRow;
-                    begin_row_edit(offset);
-                }
+                for (unsigned row = 0; row < data_row_buttons.size(); ++row)
+                    if (data_row_buttons[row].OnTouch(*touch).clicked)
+                        begin_row_edit(display_page * kDataBytesPerPage + row * kDataBytesPerRow);
                 if (data_previous.OnTouch(*touch).clicked && display_page > 0U) {
                     --display_page;
                     update_data_rows();

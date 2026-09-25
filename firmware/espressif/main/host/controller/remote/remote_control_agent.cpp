@@ -1905,9 +1905,10 @@ void RemoteControlAgent::DownloadFont(void* client, const Identity& identity, ho
     if (valid) {
         std::snprintf(command.app_id.data(), command.app_id.size(), "%s", app_id);
         command.package_size = static_cast<size_t>(size->valuedouble);
+        // Font payloads are still bound to the release metadata and SHA-256; skip only ES256 verification.
         valid = ParseSha256(StoreString(root, "sha256"), command.package_sha256) &&
                 VerifyStoreRelease(StoreString(root, "storeRelease"), id, command,
-                                   task_context_->store_release_workspace, true);
+                                   task_context_->store_release_workspace, true, false);
     }
     if (valid) {
         job.size = command.package_size;

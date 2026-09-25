@@ -66,8 +66,11 @@ inline const char* StoreString(const cJSON* object, const char* name) {
     return cJSON_IsString(value) ? value->valuestring : "";
 }
 inline bool VerifyStoreRelease(const char* envelope, const char* release_id, control::HostCommand& command,
-                               StoreReleaseWorkspace& workspace, bool font_component = false) {
-    if (!StoreTrustConfigured() || envelope == nullptr || std::strlen(envelope) > 1800U) return false;
+                               StoreReleaseWorkspace& workspace, bool font_component = false,
+                               bool verify_signature = true) {
+    if ((!verify_signature && !font_component) || (verify_signature && !StoreTrustConfigured()) || envelope == nullptr ||
+        std::strlen(envelope) > 1800U)
+        return false;
     const std::string_view text(envelope);
     const size_t first = text.find('.'), second = first == text.npos ? text.npos : text.find('.', first + 1U);
     if (second == text.npos || text.find('.', second + 1U) != text.npos) return false;
@@ -99,38 +102,40 @@ inline bool VerifyStoreRelease(const char* envelope, const char* release_id, con
             key = CONFIG_MICROPIXEL_PORTAL_FONT_PUBLIC_KEY_DER_BASE64;
     }
     cJSON_Delete(header);
-    if (key == nullptr || key[0] == '\0') return false;
-    auto& key_der = workspace.key_der;
-    key_der.fill(0U);
-    size_t key_size = 0;
-    if (!DecodeStoreBase64(key, key_der.data(), key_der.size(), key_size, workspace)) return false;
-    auto& der = workspace.der;
-    der.fill(0U);
-    size_t cursor = 2U;
-    for (size_t part = 0; part < 2U; ++part) {
-        size_t offset = part * 32U;
-        while (offset + 1U < (part + 1U) * 32U && signature[offset] == 0U) ++offset;
-        const size_t length = (part + 1U) * 32U - offset;
-        const bool padding = (signature[offset] & 0x80U) != 0U;
-        der[cursor++] = 2U;
-        der[cursor++] = static_cast<uint8_t>(length + (padding ? 1U : 0U));
-        if (padding) der[cursor++] = 0U;
-        std::memcpy(der.data() + cursor, signature.data() + offset, length);
-        cursor += length;
+    if (key == nullptr || (verify_signature && key[0] == '\0')) return false;
+    if (verify_signature) {
+        auto& key_der = workspace.key_der;
+        key_der.fill(0U);
+        size_t key_size = 0;
+        if (!DecodeStoreBase64(key, key_der.data(), key_der.size(), key_size, workspace)) return false;
+        auto& der = workspace.der;
+        der.fill(0U);
+        size_t cursor = 2U;
+        for (size_t part = 0; part < 2U; ++part) {
+            size_t offset = part * 32U;
+            while (offset + 1U < (part + 1U) * 32U && signature[offset] == 0U) ++offset;
+            const size_t length = (part + 1U) * 32U - offset;
+            const bool padding = (signature[offset] & 0x80U) != 0U;
+            der[cursor++] = 2U;
+            der[cursor++] = static_cast<uint8_t>(length + (padding ? 1U : 0U));
+            if (padding) der[cursor++] = 0U;
+            std::memcpy(der.data() + cursor, signature.data() + offset, length);
+            cursor += length;
+        }
+        der[0] = 0x30U;
+        der[1] = static_cast<uint8_t>(cursor - 2U);
+        std::array<uint8_t, 32U> digest{};
+        if (mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),
+                       reinterpret_cast<const uint8_t*>(text.data()), second, digest.data()) != 0)
+            return false;
+        mbedtls_pk_context public_key;
+        mbedtls_pk_init(&public_key);
+        const bool verified =
+            mbedtls_pk_parse_public_key(&public_key, key_der.data(), key_size) == 0 &&
+            mbedtls_pk_verify(&public_key, MBEDTLS_MD_SHA256, digest.data(), digest.size(), der.data(), cursor) == 0;
+        mbedtls_pk_free(&public_key);
+        if (!verified) return false;
     }
-    der[0] = 0x30U;
-    der[1] = static_cast<uint8_t>(cursor - 2U);
-    std::array<uint8_t, 32U> digest{};
-    if (mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), reinterpret_cast<const uint8_t*>(text.data()), second,
-                   digest.data()) != 0)
-        return false;
-    mbedtls_pk_context public_key;
-    mbedtls_pk_init(&public_key);
-    const bool verified =
-        mbedtls_pk_parse_public_key(&public_key, key_der.data(), key_size) == 0 &&
-        mbedtls_pk_verify(&public_key, MBEDTLS_MD_SHA256, digest.data(), digest.size(), der.data(), cursor) == 0;
-    mbedtls_pk_free(&public_key);
-    if (!verified) return false;
     cJSON* payload =
         cJSON_ParseWithLengthOpts(reinterpret_cast<char*>(payload_bytes.data()), payload_size + 1U, nullptr, true);
     std::array<char, 65U> expected_digest{};

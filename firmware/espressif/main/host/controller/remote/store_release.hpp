@@ -18,6 +18,10 @@
 #define CONFIG_MICROPIXEL_STORE_PREVIOUS_PUBLIC_KEY_DER_BASE64 ""
 #define CONFIG_MICROPIXEL_STORE_PREVIOUS_SIGNING_KID ""
 #endif
+#ifndef CONFIG_MICROPIXEL_PORTAL_FONT_SIGNING_KID
+#define CONFIG_MICROPIXEL_PORTAL_FONT_SIGNING_KID "portal-font-v1"
+#define CONFIG_MICROPIXEL_PORTAL_FONT_PUBLIC_KEY_DER_BASE64 ""
+#endif
 
 namespace micropixel::firmware::remote_control {
 inline constexpr const char* StoreAotTarget() {
@@ -29,7 +33,10 @@ inline constexpr const char* StoreAotTarget() {
 #error "MicroPixel App Store requires an explicit Host AOT target"
 #endif
 }
-inline bool StoreTrustConfigured() { return CONFIG_MICROPIXEL_STORE_PUBLIC_KEY_DER_BASE64[0] != '\0'; }
+inline bool StoreTrustConfigured() {
+    return CONFIG_MICROPIXEL_STORE_PUBLIC_KEY_DER_BASE64[0] != '\0' ||
+           CONFIG_MICROPIXEL_PORTAL_FONT_PUBLIC_KEY_DER_BASE64[0] != '\0';
+}
 // Owned by the remote task's PSRAM context, never by its limited call stack.
 struct StoreReleaseWorkspace final {
     std::array<uint8_t, 2048U> base64_text{};
@@ -87,6 +94,9 @@ inline bool VerifyStoreRelease(const char* envelope, const char* release_id, con
             key = CONFIG_MICROPIXEL_STORE_PUBLIC_KEY_DER_BASE64;
         else if (std::strcmp(StoreString(header, "kid"), CONFIG_MICROPIXEL_STORE_PREVIOUS_SIGNING_KID) == 0)
             key = CONFIG_MICROPIXEL_STORE_PREVIOUS_PUBLIC_KEY_DER_BASE64;
+        else if (font_component &&
+                 std::strcmp(StoreString(header, "kid"), CONFIG_MICROPIXEL_PORTAL_FONT_SIGNING_KID) == 0)
+            key = CONFIG_MICROPIXEL_PORTAL_FONT_PUBLIC_KEY_DER_BASE64;
     }
     cJSON_Delete(header);
     if (key == nullptr || key[0] == '\0') return false;

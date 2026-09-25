@@ -485,6 +485,14 @@ config MICROPIXEL_STORE_PREVIOUS_SIGNING_KID
 config MICROPIXEL_STORE_PREVIOUS_PUBLIC_KEY_DER_BASE64
     string "Previous ES256 public key in base64 DER"
     default ""
+config MICROPIXEL_PORTAL_FONT_SIGNING_KID
+    string "Firmware portal font signing key ID"
+    default "portal-font-v1"
+config MICROPIXEL_PORTAL_FONT_PUBLIC_KEY_DER_BASE64
+    string "Firmware portal font signing public key in base64 DER"
+    default ""
+    help
+        Public key only. This key is accepted only for signed font component packages.
 endmenu
 
 config MICROPIXEL_SYSTEM_TTF
